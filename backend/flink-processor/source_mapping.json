@@ -1,0 +1,14 @@
+{
+  "transaction": {
+    "transactionId": { "source": "transactionId" },
+    "sourceId": { "source": "sourceId" },
+    "sourceName": { "source": "sourceName" },
+    "targetId": { "source": "targetId" },
+    "targetName": { "source": "targetName", "default": "Unknown Target" },
+    "amount": { "source": "amount" },
+    "currency": { "constant": "USD" },
+    "ts_str": { "source": "ts_str" },
+    "type": { "source": "type" },
+    "category": { "source": "category", "default": "Uncategorized" }
+  }
+}
