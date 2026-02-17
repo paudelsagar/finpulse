@@ -1,0 +1,14 @@
+**/venv
+**/__pycache__
+**/.idea
+**/.vscode
+**/.DS_Store
+**/.ipynb_checkpoints
+
+
+**/node_modules
+**/.next
+
+
+logs/
+pids/
