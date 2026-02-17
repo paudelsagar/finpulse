@@ -67,7 +67,7 @@ export default function Dashboard() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div className="flex flex-col gap-4">
           <div className="flex flex-col md:flex-row md:items-center gap-4">
-            <h1 className="text-4xl font-bold text-foreground tracking-tight">Dashboard Overview</h1>
+            <h1 className="text-4xl font-bold text-foreground tracking-tight">Dashboard</h1>
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/5 border border-primary/10 shadow-sm self-start md:self-center">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>

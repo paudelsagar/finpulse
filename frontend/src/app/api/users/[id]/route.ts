@@ -17,7 +17,7 @@ export async function GET(
     const recentTx = await client.search({
       index: 'es_transactions',
       query: {
-        term: { "sourceId.keyword": userId }
+        term: { "sourceId": userId }
       },
       sort: [{ "ts": "desc" }],
       size: 50
@@ -28,14 +28,14 @@ export async function GET(
       index: 'es_transactions',
       size: 0,
       query: {
-        term: { "sourceId.keyword": userId }
+        term: { "sourceId": userId }
       },
       aggs: {
         total_spent: { sum: { field: 'amount' } },
         avg_spent: { avg: { field: 'amount' } },
-        tx_count: { value_count: { field: 'transactionId.keyword' } },
+        tx_count: { value_count: { field: 'transactionId' } },
         by_category: {
-          terms: { field: 'category.keyword', size: 10 },
+          terms: { field: 'category', size: 10 },
           aggs: {
              volume: { sum: { field: 'amount' } }
           }

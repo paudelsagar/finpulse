@@ -9,7 +9,7 @@ from kafka import KafkaProducer
 
 # Configuration
 KAFKA_BROKER = os.getenv("KAFKA_BROKER", "localhost:9092")
-TOPIC_NAME = os.getenv("TOPIC_NAME", "fin_v1")
+TOPIC_NAME = os.getenv("KAFKA_TOPIC", "fin-v1")
 SLEEP_TIME = float(os.getenv("SLEEP_TIME", "0.01"))  # 100 tx/sec default
 
 fake = Faker()
@@ -84,7 +84,7 @@ def generate_transaction():
         "targetName": target_name,
         "amount": amount,
         "currency": "USD",
-        "ts_str": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
+        "ts_str": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         "type": tx_type,
         "category": category,
     }

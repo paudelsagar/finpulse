@@ -45,6 +45,7 @@ services:
       - KAFKA_JAR=${KAFKA_JAR}
       - ES_JAR=${ES_JAR}
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_TOPIC=${KAFKA_TOPIC}
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
 
   taskmanager:
@@ -67,6 +68,7 @@ services:
       - KAFKA_JAR=${KAFKA_JAR}
       - ES_JAR=${ES_JAR}
       - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - KAFKA_TOPIC=${KAFKA_TOPIC}
       - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
 
   # ---------------------------

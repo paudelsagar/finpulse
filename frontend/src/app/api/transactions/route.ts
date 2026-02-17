@@ -1,3 +1,4 @@
+import { formatLocalDate } from '@/lib/utils';
 import { Client } from '@elastic/elasticsearch';
 import { NextResponse } from 'next/server';
 
@@ -18,7 +19,7 @@ export async function GET(request: Request) {
   const skip = (page - 1) * limit;
 
   // Calculate Start Time from range if provided
-  let isoRangeStart = '';
+  let localRangeStart = '';
   if (range && range !== 'all') {
     const now = Date.now();
     let startTime = now - 15 * 60 * 1000; 
@@ -30,9 +31,9 @@ export async function GET(request: Request) {
       case '30d': startTime = now - 30 * 24 * 60 * 60 * 1000; break;
       case '365d': startTime = now - 365 * 24 * 60 * 60 * 1000; break;
     }
-    isoRangeStart = new Date(startTime).toISOString();
+    localRangeStart = formatLocalDate(new Date(startTime));
   }
-  const isoRangeEnd = (range === 'custom' && endDate) ? new Date(endDate).toISOString() : new Date().toISOString();
+  const localRangeEnd = (range === 'custom' && endDate) ? formatLocalDate(new Date(endDate)) : formatLocalDate(new Date());
 
   try {
     const must: any[] = [];
@@ -42,10 +43,10 @@ export async function GET(request: Request) {
       must.push({
         bool: {
           should: [
-            { match_phrase_prefix: { "transactionId.keyword": search } },
-            { match_phrase_prefix: { "sourceName.keyword": search } },
-            { match_phrase_prefix: { "targetName.keyword": search } },
-            { match_phrase_prefix: { "category.keyword": search } }
+            { match_phrase_prefix: { "transactionId": search } },
+            { match_phrase_prefix: { "sourceName": search } },
+            { match_phrase_prefix: { "targetName": search } },
+            { match_phrase_prefix: { "category": search } }
           ],
           minimum_should_match: 1
         }
@@ -53,14 +54,14 @@ export async function GET(request: Request) {
     }
 
     if (type) {
-      filter.push({ term: { "type.keyword": type } });
+      filter.push({ term: { "type": type } });
     }
     if (category) {
-      filter.push({ term: { "category.keyword": category } });
+      filter.push({ term: { "category": category } });
     }
 
-    if (isoRangeStart) {
-      filter.push({ range: { ts: { gte: isoRangeStart, lte: isoRangeEnd } } });
+    if (localRangeStart) {
+      filter.push({ range: { ts: { gte: localRangeStart, lte: localRangeEnd } } });
     } else if (startDate || endDate) {
       const rangeQ: any = {};
       if (startDate) rangeQ.gte = startDate;
@@ -86,9 +87,9 @@ export async function GET(request: Request) {
       ],
       aggs: {
         total_volume: { sum: { field: 'amount' } },
-        by_type: { terms: { field: 'type.keyword' } },
-        available_categories: { terms: { field: 'category.keyword', size: 20 } },
-        available_types: { terms: { field: 'type.keyword' } }
+        by_type: { terms: { field: 'type' } },
+        available_categories: { terms: { field: 'category', size: 20 } },
+        available_types: { terms: { field: 'type' } }
       }
     });
 

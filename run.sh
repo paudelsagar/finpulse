@@ -6,6 +6,16 @@
 # Directories for logs and pids
 mkdir -p logs pids
 
+# Load environment variables
+if [ -f .env ]; then
+    export $(cat .env | grep -v '^#' | xargs)
+fi
+
+# Load environment variables
+if [ -f .env ]; then
+    export $(cat .env | grep -v '^#' | xargs)
+fi
+
 function wait_for_es {
     echo "Waiting for Elasticsearch to be ready..."
     MAX_RETRIES=30
@@ -30,23 +40,45 @@ function wait_for_kafka {
     echo "Kafka is up."
 }
 
+
 function show_help {
     echo "Realtime Analytics Manager"
     echo "Usage: ./run.sh [COMMAND]"
     echo ""
     echo "Commands:"
-    echo "  infra       Start Docker infrastructure (Kafka, Flink, ES) in background"
-    echo "  job         Submit Flink processing job"
-    echo "  gen         Start Mock Data Generator (Background + Log)"
-    echo "  ui          Start Next.js Dashboard (Background + Log)"
-    echo "  all         Start Infra, Submit Job, Start Gen & UI"
+    echo "  start       Start Infra, Submit Job, Start Gen & UI (Same as 'all')"
     echo "  stop        Stop all processes and infrastructure"
+    echo "  restart     Stop then Start"
     echo "  status      Check status of processes"
+    echo "  clean-start Stop, Wipe Data (Volumes), then Start"
     echo "  logs [svc]  Tail logs for 'gen' or 'ui'"
+    echo ""
+    echo "  infra       Start Docker infrastructure only"
+    echo "  job         Submit Flink processing job only"
+    echo "  gen         Start Mock Data Generator only"
+    echo "  ui          Start Next.js Dashboard only"
     echo ""
 }
 
-if [ "$1" == "infra" ] || [ "$1" == "all" ] && [ "$1" == "infra" ]; then
+# Helper to stop processes safely
+function stop_process {
+    PID_FILE=$1
+    NAME=$2
+    if [ -f "$PID_FILE" ]; then
+        PID=$(cat "$PID_FILE")
+        if ps -p $PID > /dev/null; then
+            kill $PID 2>/dev/null
+            echo "$NAME stopped (PID: $PID)."
+        else
+            echo "$NAME was not running (Stale PID)."
+        fi
+        rm "$PID_FILE"
+    fi
+    # Fallback to pkill just in case
+    pkill -f "$3" 2>/dev/null
+}
+
+if [ "$1" == "infra" ]; then
     echo "Starting Docker Infrastructure..."
     docker compose up -d
     echo "Infrastructure started."
@@ -54,23 +86,24 @@ if [ "$1" == "infra" ] || [ "$1" == "all" ] && [ "$1" == "infra" ]; then
 elif [ "$1" == "stop" ]; then
     echo "Stopping components..."
     
-    # Stop Generator
-    if [ -f pids/datagen.pid ]; then
-        kill $(cat pids/datagen.pid) 2>/dev/null
-        rm pids/datagen.pid
-        echo "Data Generator stopped."
-    fi
-
-    # Stop UI
-    if [ -f pids/frontend.pid ]; then
-        kill $(cat pids/frontend.pid) 2>/dev/null
-        rm pids/frontend.pid
-        echo "Dashboard stopped."
-    fi
+    stop_process "pids/datagen.pid" "Data Generator" "main.py"
+    stop_process "pids/datagen.pid" "Backfill Generator" "backfill.py"
+    stop_process "pids/frontend.pid" "Dashboard" "next-server"
 
     echo "Stopping Docker Infrastructure..."
     docker compose down
     echo "All stopped."
+
+elif [ "$1" == "clean-start" ]; then
+    $0 stop
+    echo "Wiping Docker volumes..."
+    docker compose down -v
+    echo "Data wiped."
+    $0 start
+
+elif [ "$1" == "restart" ]; then
+    $0 stop
+    $0 start
 
 elif [ "$1" == "job" ]; then
     echo "Submitting Flink Job..."
@@ -108,13 +141,13 @@ elif [ "$1" == "ui" ]; then
     echo "Dashboard started (PID: $PID). Logs: logs/frontend.log"
     cd ..
 
-elif [ "$1" == "all" ]; then
-    ./run.sh infra
+elif [ "$1" == "all" ] || [ "$1" == "start" ]; then
+    $0 infra
     wait_for_es
     wait_for_kafka
     
     echo "Preparing Kafka topics..."
-    docker exec kafka kafka-topics --create --if-not-exists --topic fin_v1 --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
+    docker exec kafka kafka-topics --create --if-not-exists --topic ${KAFKA_TOPIC:-fin-v1} --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
     
     echo "Preparing Elasticsearch indices..."
     # Transactions Index
@@ -195,9 +228,9 @@ elif [ "$1" == "all" ]; then
     
     echo ""
     
-    ./run.sh job
-    ./run.sh gen
-    ./run.sh ui
+    $0 job
+    $0 gen
+    $0 ui
     echo "Full stack is running properly."
 
 elif [ "$1" == "status" ]; then

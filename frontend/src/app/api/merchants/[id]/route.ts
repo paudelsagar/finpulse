@@ -1,3 +1,4 @@
+import { formatLocalDate } from '@/lib/utils';
 import { Client } from '@elastic/elasticsearch';
 import { NextResponse } from 'next/server';
 
@@ -19,7 +20,7 @@ export async function GET(
 
   // Build temporal filter
   const filters: any[] = [
-    { term: { "targetId.keyword": merchantId } }
+    { term: { "targetId": merchantId } }
   ];
 
   if (startDate || endDate) {
@@ -51,8 +52,8 @@ export async function GET(
     }
   }
   
-  const isoStart = new Date(startTime).toISOString();
-  const isoEnd = new Date(endTime).toISOString();
+  const localStart = formatLocalDate(new Date(startTime));
+  const localEnd = formatLocalDate(new Date(endTime));
 
   const query = {
     bool: {
@@ -77,8 +78,8 @@ export async function GET(
       aggs: {
         total_revenue: { sum: { field: 'amount' } },
         avg_sale: { avg: { field: 'amount' } },
-        tx_count: { value_count: { field: 'transactionId.keyword' } },
-        unique_customers: { cardinality: { field: 'sourceId.keyword' } },
+        tx_count: { value_count: { field: 'transactionId' } },
+        unique_customers: { cardinality: { field: 'sourceId' } },
         revenue_over_time: {
           date_histogram: {
             field: 'ts',
@@ -87,7 +88,7 @@ export async function GET(
           },
           aggs: {
             volume: { sum: { field: 'amount' } },
-            count: { value_count: { field: 'transactionId.keyword' } }
+            count: { value_count: { field: 'transactionId' } }
           }
         },
         hourly_distribution: {
@@ -101,14 +102,14 @@ export async function GET(
         },
         top_users: {
           terms: {
-            field: 'sourceId.keyword',
+            field: 'sourceId',
             size: 50,
             order: { volume: "desc" }
           },
           aggs: {
             volume: { sum: { field: 'amount' } },
-            count: { value_count: { field: 'transactionId.keyword' } },
-            name: { terms: { field: 'sourceName.keyword', size: 1 } }
+            count: { value_count: { field: 'transactionId' } },
+            name: { terms: { field: 'sourceName', size: 1 } }
           }
         }
       }

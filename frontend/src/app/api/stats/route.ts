@@ -1,3 +1,4 @@
+import { formatLocalDate } from '@/lib/utils';
 import { Client } from '@elastic/elasticsearch';
 import { NextResponse } from 'next/server';
 
@@ -39,8 +40,8 @@ export async function GET(request: Request) {
     }
   }
   
-  const isoStart = new Date(startTime).toISOString();
-  const isoEnd = new Date(endTime).toISOString();
+  const localStart = formatLocalDate(new Date(startTime));
+  const localEnd = formatLocalDate(new Date(endTime));
 
   try {
     // 1. Get Recent Transactions (Filtered by time)
@@ -50,7 +51,7 @@ export async function GET(request: Request) {
       size: 10,
       query: {
          range: {
-             ts: { gte: isoStart }
+             ts: { gte: localStart }
          }
       }
     });
@@ -62,7 +63,7 @@ export async function GET(request: Request) {
       track_total_hits: true,
       query: {
          range: {
-             ts: { gte: isoStart, lte: isoEnd }
+             ts: { gte: localStart, lte: localEnd }
          }
       },
       aggs: {
@@ -140,7 +141,7 @@ export async function GET(request: Request) {
         tx_count: b.tx_count.value,
         avg_amount: b.avg_amount.value,
         max_amount: b.max_amount.value,
-        window_end: new Date().toISOString()
+        window_end: formatLocalDate(new Date())
     })) || [];
 
     // 4. Get High Value Alerts
@@ -150,7 +151,7 @@ export async function GET(request: Request) {
       size: 5,
       query: {
          range: {
-             ts: { gte: isoStart }
+             ts: { gte: localStart }
          }
       }
     });

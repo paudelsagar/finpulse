@@ -58,6 +58,7 @@ def log_processing():
 
     # 3. Infrastructure Configuration
     kafka_servers = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
+    kafka_topic = os.environ.get("KAFKA_TOPIC", "fin-v1")
     es_hosts = os.environ.get("ELASTICSEARCH_HOSTS", "http://elasticsearch:9200")
 
     # 3. Define Source Table (Kafka)
@@ -78,7 +79,7 @@ def log_processing():
             WATERMARK FOR ts AS ts - INTERVAL '5' SECOND -- Handle out-of-order events
         ) WITH (
             'connector' = 'kafka',
-            'topic' = 'fin_v1',
+            'topic' = '{kafka_topic}',
             'properties.bootstrap.servers' = '{kafka_servers}',
             'properties.group.id' = 'flink-processor-group-v2',
             'scan.startup.mode' = 'earliest-offset',
@@ -87,7 +88,7 @@ def log_processing():
             'json.ignore-parse-errors' = 'true'
         )
     """.format(
-            kafka_servers=kafka_servers
+            kafka_servers=kafka_servers, kafka_topic=kafka_topic
         )
     )
 

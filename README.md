@@ -9,40 +9,76 @@ A high-performance real-time analytics dashboard for diverse financial data stre
 ```mermaid
 graph TD
     subgraph "Data Sources"
-        DG["Python Data Generator"]
+        DG["Python Data Generator<br/>(Faker)"]
     end
 
     subgraph "Messaging Layer"
-        K["Apache Kafka<br/>(topic: transactions)"]
+        K["Apache Kafka<br/>(Topic: fin-transaction)"]
     end
 
-    subgraph "Stream Processing"
-        F["Apache Flink"]
+    subgraph "Stream Processing Layer"
+        F["Apache Flink<br/>(Stateful Stream Processing)"]
+        W["Window Aggregations<br/>(Tumbling & Sliding)"]
+        F --> W
     end
 
     subgraph "Storage Layer"
-        ES1[("Elasticsearch<br/>Index: es_transactions")]
-        ES2[("Elasticsearch<br/>Index: es_category_stats")]
+        ES1[("Elasticsearch<br/>Idx: es_transactions")]
+        ES2[("Elasticsearch<br/>Idx: es_daily_stats")]
+        ES3[("Elasticsearch<br/>Idx: es_monthly_stats")]
+        ES4[("Elasticsearch<br/>Idx: es_high_value")]
     end
 
     subgraph "Application Layer"
-        API["Next.js API<br/>(Backend)"]
+        API["Next.js API Routes<br/>(Backend)"]
         UI["Next.js Dashboard<br/>(Frontend)"]
     end
 
-    DG -->|Publish| K
-    K -->|Consume| F
-    F -->|Sink Raw| ES1
-    F -->|Windowed Aggregations| ES2
+    DG -->|JSON Events| K
+    K -->|Consume Stream| F
+    W -->|Sink Raw Data| ES1
+    W -->|Sink Rollups| ES2
+    W -->|Sink Rollups| ES3
+    W -->|Sink Alerts| ES4
+    
     ES1 -.->|Query| API
     ES2 -.->|Query| API
-    API <-->|Fetch| UI
+    ES3 -.->|Query| API
+    ES4 -.->|Query| API
+    
+    API <-->|REST / SWR| UI
 ```
 
-- **Ingestion**: Kafka (`transactions` topic).
-- **Processing**: Apache Flink (Stateful stream processing, Aggregations).
-- **Storage**: Elasticsearch (Indexing & Analytics).
-- **Frontend**: Next.js 14 + Tailwind CSS + Recharts (Real-time Dashboard).
+### Technology Stack
+
+| Component | Technology | Version | Description |
+| :--- | :--- | :--- | :--- |
+| **Frontend** | Next.js | 14 | React framework with Tailwind CSS and Recharts. |
+| **Backend API** | Next.js API | 14 | Serverless functions for Elasticsearch queries. |
+| **Stream Processing** | Apache Flink | 1.18 | Stateful stream processing and windowed aggregations. |
+| **Messaging** | Apache Kafka | 7.5 | High-throughput distributed event streaming. |
+| **Storage** | Elasticsearch | 7.17 | Search engine and analytics store. |
+| **Data Gen** | Python | 3.11 | Synthetic financial transaction generator using Faker. |
+
+### Data Pipeline Flow
+
+1.  **Ingestion**: 
+    *   The `datagen` service (Python) generates realistic financial transactions (payments, transfers, withdrawals) using the Faker library.
+    *   Events are serialized to JSON and published to the `fin-transaction` Kafka topic.
+
+2.  **Stream Processing**:
+    *   Apache Flink consumes the Kafka stream.
+    *   **Watermark Strategy**: Assigns event-time watermarks (allowing for 5-second out-of-order data) to handle late arrivals correctly.
+    *   **Transformation**: The stream is split into multiple logical flows:
+        *   **Raw Storage**: All events are indexed into `es_transactions` for granular search.
+        *   **High-Value Detection**: Transactions > $5,000 are filtered and sunk to `es_high_value`.
+        *   ** Entity Flows**: Debits and credits are split to track per-user/merchant cash flow in `es_entity_flows`.
+        *   **Temporal Aggregations**: Tumbling windows calculate metrics (Volume, Count, Unique Users) for Daily (`es_daily_stats`) and Monthly (`es_monthly_stats`) rollups.
+
+3.  **Presentation**:
+    *   The Next.js Dashboard polls the API layer.
+    *   API routes construct complex boolean queries to retrieve data from Elasticsearch.
+    *   The UI renders real-time charts (Recharts) and KPI tiles, refreshing every few seconds to reflect the live data stream.
 
 
 

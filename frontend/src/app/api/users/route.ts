@@ -1,3 +1,4 @@
+import { formatLocalDate } from '@/lib/utils';
 import { Client } from '@elastic/elasticsearch';
 import { NextResponse } from 'next/server';
 
@@ -40,46 +41,33 @@ export async function GET(request: Request) {
     }
   }
   
-  const isoStart = new Date(startTime).toISOString();
-  const isoEnd = new Date(endTime).toISOString();
+  const localStart = formatLocalDate(new Date(startTime));
+  const localEnd = formatLocalDate(new Date(endTime));
 
   try {
     const results = await client.search({
       index: 'es_entity_flows',
       size: 0,
-      query: { // Moved filter to query for consistency and to apply to all aggregations
+      query: { 
         bool: {
           must: [
-            { prefix: { "entityId.keyword": "u_" } },
-            { range: { ts: { gte: isoStart, lte: isoEnd } } }
+            { prefix: { "entityId": "u_" } },
+            { range: { ts: { gte: localStart, lte: localEnd } } }
           ]
         }
       },
       aggs: {
         unique_users: {
-          // The filter was moved to the main query, so this filter is no longer needed here
-          // filter: {
-          //   bool: {
-          //     must: [
-          //       { prefix: { "entityId.keyword": "u_" } },
-          //       { range: { ts: { gte: isoStart, lte: isoEnd } } } // Already in main query
-          //     ]
-          //   }
-          // },
+          terms: {
+            field: 'entityId',
+            size: 5000 
+          },
           aggs: {
-            by_id: {
-              terms: {
-                field: 'entityId.keyword',
-                size: 5000 
-              },
+            name: { terms: { field: 'entityName', size: 1 } },
+            flows: {
+              terms: { field: 'flow_type' },
               aggs: {
-                name: { terms: { field: 'entityName.keyword', size: 1 } },
-                flows: {
-                  terms: { field: 'flow_type.keyword' },
-                  aggs: {
-                    total: { sum: { field: 'amount' } }
-                  }
-                }
+                total: { sum: { field: 'amount' } }
               }
             }
           }
@@ -88,7 +76,7 @@ export async function GET(request: Request) {
     });
 
     const aggs = results.aggregations as any;
-    const allUsers = aggs.unique_users.by_id.buckets.map((b: any) => {
+    const allUsers = aggs.unique_users.buckets.map((b: any) => {
         const flows = b.flows.buckets;
         const credit = flows.find((f: any) => f.key === 'CREDIT')?.total.value || 0;
         const debit = Math.abs(flows.find((f: any) => f.key === 'DEBIT')?.total.value || 0);
@@ -109,7 +97,7 @@ export async function GET(request: Request) {
       index: 'es_transactions',
       size: 0,
       query: {
-        range: { ts: { gte: isoStart } }
+        range: { ts: { gte: localStart } }
       },
       aggs: {
         activity_trend: {

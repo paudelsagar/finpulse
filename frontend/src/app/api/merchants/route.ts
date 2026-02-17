@@ -1,3 +1,4 @@
+import { formatLocalDate } from '@/lib/utils';
 import { Client } from '@elastic/elasticsearch';
 import { NextResponse } from 'next/server';
 
@@ -31,8 +32,8 @@ export async function GET(request: Request) {
     }
   }
   
-  const isoStart = new Date(startTime).toISOString();
-  const isoEnd = new Date(endTime).toISOString();
+  const localStart = formatLocalDate(new Date(startTime));
+  const localEnd = formatLocalDate(new Date(endTime));
 
   try {
     const results = await client.search({
@@ -44,23 +45,23 @@ export async function GET(request: Request) {
             bool: {
               must: [
                 { match_all: {} },
-                { range: { ts: { gte: isoStart, lte: isoEnd } } }
+                { range: { ts: { gte: localStart, lte: localEnd } } }
               ]
             }
           },
           aggs: {
             ids: {
               terms: {
-                field: 'entityId.keyword',
+                field: 'entityId',
                 size: 1000
               },
               aggs: {
-                name: { terms: { field: 'entityName.keyword', size: 1 } },
+                name: { terms: { field: 'entityName', size: 1 } },
                 flows: {
-                  terms: { field: 'flow_type.keyword' },
+                  terms: { field: 'flow_type' },
                   aggs: {
                     total: { sum: { field: 'amount' } },
-                    tx_count: { value_count: { field: 'entityId.keyword' } }
+                    tx_count: { value_count: { field: 'entityId' } }
                   }
                 }
               }

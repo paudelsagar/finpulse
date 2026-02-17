@@ -1,3 +1,4 @@
+import { formatLocalDate } from '@/lib/utils';
 import { Client } from '@elastic/elasticsearch';
 import { NextResponse } from 'next/server';
 
@@ -35,8 +36,8 @@ export async function GET(request: Request) {
     else interval = '7d';
   }
 
-  const isoStart = new Date(startTime).toISOString();
-  const isoEnd = new Date(endTime).toISOString();
+  const localStart = formatLocalDate(new Date(startTime));
+  const localEnd = formatLocalDate(new Date(endTime));
 
   try {
     const results = await client.search({
@@ -44,7 +45,7 @@ export async function GET(request: Request) {
       size: 0,
       query: {
         range: {
-          ts: { gte: isoStart, lte: isoEnd }
+          ts: { gte: localStart, lte: localEnd }
         }
       },
       aggs: {
@@ -60,20 +61,20 @@ export async function GET(request: Request) {
           }
         },
         revenue_by_category: {
-          terms: { field: 'category.keyword', size: 10 },
+          terms: { field: 'category', size: 10 },
           aggs: {
             revenue: { sum: { field: 'amount' } }
           }
         },
         revenue_by_type: {
-          terms: { field: 'type.keyword', size: 10 },
+          terms: { field: 'type', size: 10 },
           aggs: {
             revenue: { sum: { field: 'amount' } }
           }
         },
         top_merchants: {
           terms: { 
-            field: 'targetName.keyword', 
+            field: 'targetName', 
             size: 5,
             order: { revenue: "desc" }
           },
