@@ -65,13 +65,21 @@ export default function Dashboard() {
     <div className="max-w-7xl mx-auto space-y-6 pb-12">
       
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-4xl font-bold text-foreground tracking-tight">Dashboard Overview</h1>
-          <p className="text-muted-foreground mt-2 text-md flex items-center gap-2">
-            <span className="relative flex h-2.5 w-2.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
-            </span>
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-col md:flex-row md:items-center gap-4">
+            <h1 className="text-4xl font-bold text-foreground tracking-tight">Dashboard Overview</h1>
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/5 border border-primary/10 shadow-sm self-start md:self-center">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+              </span>
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Last Sync:</span>
+              <span className="text-[10px] font-mono font-bold text-primary tabular-nums">
+                {new Date().toLocaleTimeString()}
+              </span>
+            </div>
+          </div>
+          <p className="text-muted-foreground text-md">
             Real-time monitoring of global transaction flows and network performance.
           </p>
         </div>
@@ -207,7 +215,7 @@ export default function Dashboard() {
            <VolumeChart data={volHistory} />
         </div>
         <div className="lg:col-span-2 space-y-8">
-            <PaymentTypeChart data={data?.stats?.by_type?.buckets || []} />
+            <HighValueAlerts alerts={data?.alerts || []} />
         </div>
       </div>
 
@@ -223,7 +231,7 @@ export default function Dashboard() {
            />
         </div>
         <div className="lg:col-span-2">
-           <HighValueAlerts alerts={data?.alerts || []} />
+           <PaymentTypeChart data={data?.stats?.by_type?.buckets || []} />
         </div>
       </div>
 

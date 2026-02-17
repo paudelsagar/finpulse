@@ -9,7 +9,7 @@ from kafka import KafkaProducer
 
 # Configuration
 KAFKA_BROKER = os.getenv("KAFKA_BROKER", "localhost:9092")
-TOPIC_NAME = os.getenv("TOPIC_NAME", "transactions")
+TOPIC_NAME = os.getenv("TOPIC_NAME", "fin_v1")
 SLEEP_TIME = float(os.getenv("SLEEP_TIME", "0.01"))  # 100 tx/sec default
 
 fake = Faker()
@@ -72,9 +72,9 @@ def generate_transaction():
     if amount > 5000:
         amount = 5000.00
 
-    # Simulate high value fraud occasionally
-    if random.random() < 0.001:
-        amount = round(random.uniform(10000, 50000), 2)
+    # Simulate high value fraud/alerts more frequently for demo
+    if random.random() < 0.02:
+        amount = round(random.uniform(5001, 25000), 2)
 
     return {
         "transactionId": fake.uuid4(),
@@ -84,7 +84,7 @@ def generate_transaction():
         "targetName": target_name,
         "amount": amount,
         "currency": "USD",
-        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "ts_str": datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S"),
         "type": tx_type,
         "category": category,
     }
@@ -100,7 +100,7 @@ def main():
             producer.send(TOPIC_NAME, tx)
             producer.flush()
             print(
-                f"Sent: {tx['type']} ${tx['amount']} -> {tx['targetName']} ts={tx['timestamp']}"
+                f"Sent: {tx['type']} ${tx['amount']} -> {tx['targetName']} ts={tx['ts_str']}"
             )
             time.sleep(SLEEP_TIME)
     except KeyboardInterrupt:

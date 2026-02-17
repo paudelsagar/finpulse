@@ -67,7 +67,7 @@ export async function GET(request: Request) {
       },
       aggs: {
         total_volume: { sum: { field: 'amount' } },
-        active_users: { cardinality: { field: 'sourceId.keyword' } },
+        active_users: { cardinality: { field: 'sourceId' } },
         tps_window: {
           filter: {
             range: {
@@ -76,15 +76,15 @@ export async function GET(request: Request) {
           }
         },
         by_type: { 
-          terms: { field: 'type.keyword' },
+          terms: { field: 'type' },
           aggs: {
             total_spent: { sum: { field: 'amount' } }
           }
         },
-        by_currency: { terms: { field: 'currency.keyword' } },
+        by_currency: { terms: { field: 'currency' } },
         top_merchants_by_volume: { 
           terms: { 
-            field: 'targetName.keyword', 
+            field: 'targetName', 
             size: 5,
             order: { total_spent: "desc" }
           },
@@ -94,7 +94,7 @@ export async function GET(request: Request) {
         },
         top_merchants_by_count: { 
           terms: { 
-            field: 'targetName.keyword', 
+            field: 'targetName', 
             size: 5,
             order: { _count: "desc" }
           },
@@ -122,10 +122,10 @@ export async function GET(request: Request) {
            }
         },
         by_category: {
-          terms: { field: 'category.keyword', size: 20 },
+          terms: { field: 'category', size: 20 },
           aggs: {
               total_volume: { sum: { field: 'amount' } },
-              tx_count: { value_count: { field: 'transactionId.keyword' } },
+              tx_count: { value_count: { field: 'transactionId' } },
               avg_amount: { avg: { field: 'amount' } },
               max_amount: { max: { field: 'amount' } }
           }

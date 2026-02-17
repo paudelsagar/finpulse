@@ -1,4 +1,4 @@
-# Real-time Financial Analytics Platform
+# FinPulse
 
 A high-performance real-time analytics dashboard for diverse financial data streams, built with **Apache Flink**, **Kafka**, **Elasticsearch**, and **Next.js**.
 

@@ -114,7 +114,84 @@ elif [ "$1" == "all" ]; then
     wait_for_kafka
     
     echo "Preparing Kafka topics..."
-    docker exec kafka kafka-topics --create --if-not-exists --topic transactions --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
+    docker exec kafka kafka-topics --create --if-not-exists --topic fin_v1 --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
+    
+    echo "Preparing Elasticsearch indices..."
+    # Transactions Index
+    curl -X PUT "http://localhost:9200/es_transactions" -H 'Content-Type: application/json' -d'
+    {
+      "mappings": {
+        "properties": {
+          "ts": { "type": "date", "format": "yyyy-MM-dd HH:mm:ss||strict_date_optional_time||epoch_millis" },
+          "amount": { "type": "float" },
+          "category": { "type": "keyword" },
+          "type": { "type": "keyword" },
+          "currency": { "type": "keyword" },
+          "sourceId": { "type": "keyword" },
+          "targetId": { "type": "keyword" },
+          "sourceName": { "type": "keyword" },
+          "targetName": { "type": "keyword" },
+          "transactionId": { "type": "keyword" }
+        }
+      }
+    }' 2>/dev/null
+
+    # High Value Alerts Index
+    curl -X PUT "http://localhost:9200/es_high_value" -H 'Content-Type: application/json' -d'
+    {
+      "mappings": {
+        "properties": {
+          "ts": { "type": "date", "format": "yyyy-MM-dd HH:mm:ss||strict_date_optional_time||epoch_millis" },
+          "amount": { "type": "float" },
+          "sourceName": { "type": "keyword" },
+          "targetName": { "type": "keyword" },
+          "transactionId": { "type": "keyword" }
+        }
+      }
+    }' 2>/dev/null
+
+    # Entity Flows Index
+    curl -X PUT "http://localhost:9200/es_entity_flows" -H 'Content-Type: application/json' -d'
+    {
+      "mappings": {
+        "properties": {
+          "ts": { "type": "date", "format": "yyyy-MM-dd HH:mm:ss||strict_date_optional_time||epoch_millis" },
+          "amount": { "type": "float" },
+          "entityId": { "type": "keyword" },
+          "entityName": { "type": "keyword" },
+          "flow_type": { "type": "keyword" },
+          "transactionId": { "type": "keyword" }
+        }
+      }
+    }' 2>/dev/null
+
+    # Daily Rollup Index
+    curl -X PUT "http://localhost:9200/es_daily_stats" -H 'Content-Type: application/json' -d'
+    {
+      "mappings": {
+        "properties": {
+          "window_start": { "type": "date", "format": "yyyy-MM-dd HH:mm:ss||strict_date_optional_time||epoch_millis" },
+          "total_volume": { "type": "float" },
+          "tx_count": { "type": "long" },
+          "avg_amount": { "type": "float" },
+          "unique_users": { "type": "long" }
+        }
+      }
+    }' 2>/dev/null
+
+    # Monthly Rollup Index
+    curl -X PUT "http://localhost:9200/es_monthly_stats" -H 'Content-Type: application/json' -d'
+    {
+      "mappings": {
+        "properties": {
+          "window_start": { "type": "date", "format": "yyyy-MM-dd HH:mm:ss||strict_date_optional_time||epoch_millis" },
+          "total_volume": { "type": "float" },
+          "tx_count": { "type": "long" },
+          "avg_amount": { "type": "float" },
+          "unique_users": { "type": "long" }
+        }
+      }
+    }' 2>/dev/null
     
     echo ""
     

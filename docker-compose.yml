@@ -44,6 +44,8 @@ services:
         jobmanager.rpc.address: jobmanager
       - KAFKA_JAR=${KAFKA_JAR}
       - ES_JAR=${ES_JAR}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
 
   taskmanager:
     build:
@@ -64,6 +66,8 @@ services:
         taskmanager.numberOfTaskSlots: 2
       - KAFKA_JAR=${KAFKA_JAR}
       - ES_JAR=${ES_JAR}
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:29092
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
 
   # ---------------------------
   # Storage & Analytics (ES)
