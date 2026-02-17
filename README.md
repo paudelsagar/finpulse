@@ -1,6 +1,22 @@
 # FinPulse
 
-A high-performance real-time analytics dashboard for diverse financial data streams, built with **Apache Flink**, **Kafka**, **Elasticsearch**, and **Next.js**.
+FinPulse is a production inspired, end to end **real time financial analytics platform** designed to simulate how modern banks, wallets, and payment gateways process and analyze high velocity transaction streams.
+
+The platform demonstrates how raw financial events such as P2P transfers, merchant payments, and digital transactions can be ingested, processed, aggregated, and visualized **within seconds**, while preserving correctness, scalability, and analytical depth.
+
+Built on **Apache Kafka** and **Apache Flink**, FinPulse performs stateful stream processing and time windowed aggregations on live transaction data. **Elasticsearch** serves as the analytical store for both raw events and precomputed rollups, while **Next.js** powers an interactive dashboard that exposes KPIs, trends, and anomalies in near real time.
+
+FinPulse is intentionally designed to mirror **real world banking and fintech workloads**, including:
+
+- High throughput ingestion
+- Event driven stream processing
+- Temporal aggregations for daily and monthly insights
+- High value transaction detection
+- Searchable transaction and entity level views
+
+
+
+---
 
 
 
@@ -49,6 +65,12 @@ graph TD
     API <-->|REST / SWR| UI
 ```
 
+
+
+---
+
+
+
 ### Technology Stack
 
 | Component | Technology | Version | Description |
@@ -59,6 +81,12 @@ graph TD
 | **Messaging** | Apache Kafka | 7.5 | High-throughput distributed event streaming. |
 | **Storage** | Elasticsearch | 7.17 | Search engine and analytics store. |
 | **Data Gen** | Python | 3.11 | Synthetic financial transaction generator using Faker. |
+
+
+
+---
+
+
 
 ### Data Pipeline Flow
 
@@ -79,6 +107,10 @@ graph TD
     *   The Next.js Dashboard polls the API layer.
     *   API routes construct complex boolean queries to retrieve data from Elasticsearch.
     *   The UI renders real-time charts (Recharts) and KPI tiles, refreshing every few seconds to reflect the live data stream.
+
+
+
+---
 
 
 
@@ -105,6 +137,10 @@ The fastest way to start the entire platform is using the manager script:
 
 
 
+---
+
+
+
 ## Ports Reference
 
 | Service | Port | Description |
@@ -117,6 +153,62 @@ The fastest way to start the entire platform is using the manager script:
 
 
 
+---
+
+
+
+## Input Data
+
+### Current
+
+| Field           | Type     | Description                            | Example                                          |
+| :-------------- | :------- | :------------------------------------- | :----------------------------------------------- |
+| `transactionId` | `string` | Unique UUID for the transaction.       | `f47ac10b-58cc-4372-a567-0e02b2c3d479`           |
+| `sourceId`      | `string` | ID of the sender (from user pool).     | `u_123`                                          |
+| `sourceName`    | `string` | Name of the sender.                    | `John Doe`                                       |
+| `targetId`      | `string` | ID of the receiver (Merchant or User). | `m_uber` (Merchant) or `u_456` (Peer)            |
+| `targetName`    | `string` | Name of the receiver.                  | `Uber` or `Jane Smith`                           |
+| `amount`        | `float`  | Transaction value (weighted random).   | `42.50`                                          |
+| `currency`      | `string` | Currency code (Hardcoded).             | `USD`                                            |
+| `ts_str`        | `string` | Local timestamp string.                | `2026-02-17 14:45:00`                            |
+| `type`          | `string` | Transaction type.                      | `P2P` (Peer-to-Peer) or `P2M` (Peer-to-Merchant) |
+| `category`      | `string` | Merchant category or "Transfer".       | `Transport`, `Food & Drink`, `Transfer`          |
+
+
+
+---
+
+
+
+### Next
+
+| Field                   | Data Type | Description                                                  |
+| ----------------------- | --------- | ------------------------------------------------------------ |
+| tran_id                 | string    | Unique transaction identifier                                |
+| tran_date               | datetime  | Local transaction datetime                                   |
+| user_id                 | string    | Initiating user identifier                                   |
+| account_id              | string    | Initiating account or wallet identifier                      |
+| counterparty_user_id    | string    | Counterparty user identifier (nullable for merchants)        |
+| counterparty_account_id | string    | Counterparty account or wallet identifier                    |
+| transaction_type        | string    | Nature of transaction. P2P, P2M, M2P, B2B, SELF              |
+| payment_method          | string    | Payment rail or instrument. QR, IBFT, WALLET, BANK_TRANSFER, CARD |
+| merchant_id             | string    | Merchant identifier. Null for non merchant transactions      |
+| merchant_category       | string    | Business category. FOOD, GROCERY, TRAVEL, UTILITIES, EDUCATION, HEALTH |
+| mcc_code                | string    | Standard merchant category code (ISO). Nullable              |
+| amount                  | decimal   | Transaction amount                                           |
+| currency                | string    | Currency code. NPR, USD                                      |
+| remark                  | string    | User or system remarks                                       |
+| channel                 | string    | Initiation channel. Mobile, Web, POS, API                    |
+| transaction_status      | string    | SUCCESS, FAILED, PENDING, REVERSED                           |
+| reference_tran_id       | string    | Reference transaction id for reversal or refund              |
+| created_at              | datetime  | System ingestion timestamp                                   |
+
+
+
+---
+
+
+
 ## Features
 
 - **Real-time Data Stream**: High-throughput processing of financial events.
@@ -124,6 +216,10 @@ The fastest way to start the entire platform is using the manager script:
 - **Anomaly Alerting**: Immediate notifications for high-value or unusual activities.
 - **Robust Searching**: Support for User, Entity, and Transaction Ledger lookups.
 - **Data Sync**: Real-time heartbeats synchronized across all analytics views.
+
+
+
+---
 
 
 
@@ -138,11 +234,19 @@ This architecture is designed for high-throughput, low-latency financial workloa
 
 
 
+---
+
+
+
 ### Stream Processing (Flink)
 
 - **Latency**: Sub-millisecond stateful processing.
 - **Scalability**: Flink clusters can scale to thousands of nodes. It handles backpressure automatically, ensuring the UI stays responsive even during traffic spikes.
 - **State Management**: Uses RocksDB for multi-terabyte state management (e.g., tracking "Top Spender" over years).
+
+
+
+---
 
 
 
@@ -154,10 +258,18 @@ This architecture is designed for high-throughput, low-latency financial workloa
 
 
 
+---
+
+
+
 ### Application Layer (Next.js)
 
 - **Stateless API**: Easily deployed in containers (K8s/Docker) and load-balanced.
 - **Optimized Fetching**: Server-side pagination and debounced searching prevent UI bottlenecks.
+
+
+
+---
 
 
 
@@ -171,9 +283,3 @@ While the current stack is robust, the following improvements would further enha
 4.  **Real-time Push (WebSockets/SSE)**: Replacing the current HTTP polling mechanism with WebSockets to further reduce latency and API overhead.
 5.  **Multi-Tiered Storage**: Automatically archiving aged raw data from Elasticsearch to Apache Iceberg or S3 for long-term compliance auditing at lower cost.
 6.  **AI/ML Anomaly Detection**: Integrating a Flink-ML module or side-calls to a real-time inference endpoint for advanced financial fraud detection.
-
-
-
-## License
-
-MIT
