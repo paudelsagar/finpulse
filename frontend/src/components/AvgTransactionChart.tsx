@@ -39,7 +39,7 @@ export default function AvgTransactionChart({ data }: { data: any[] }) {
             hide 
             domain={['auto', 'auto']}
           />
-          <Tooltip content={<CustomTooltip />} />
+          <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--muted)', strokeWidth: 1, opacity: 0.5 }} />
           <Line 
             type="monotone" 
             dataKey="avg" 

@@ -9,8 +9,8 @@ interface CreditDebitSplitProps {
 export default function CreditDebitSplit({ data }: CreditDebitSplitProps) {
   const chartData = data.map(bucket => ({
     name: new Date(bucket.key).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-    Credits: bucket.flows.buckets.credits.volume?.value || 0,
-    Debits: bucket.flows.buckets.debits.volume?.value || 0
+    Credits: bucket.flows?.buckets?.credits?.volume?.value || 0,
+    Debits: bucket.flows?.buckets?.debits?.volume?.value || 0
   }));
 
   return (
@@ -33,8 +33,8 @@ export default function CreditDebitSplit({ data }: CreditDebitSplitProps) {
             />
             <YAxis hide />
             <Tooltip 
-              cursor={{ fill: 'hsl(var(--muted)/0.2)' }}
-              contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+              cursor={{ fill: 'var(--muted)', opacity: 0.2 }}
+              contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', borderRadius: '8px' }}
               itemStyle={{ fontSize: '12px' }}
             />
             <Legend verticalAlign="top" align="right" height={36} iconType="circle" />

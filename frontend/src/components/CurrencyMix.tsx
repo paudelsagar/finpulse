@@ -44,7 +44,7 @@ export default function CurrencyMix({ data }: CurrencyMixProps) {
               ))}
             </Pie>
             <Tooltip 
-              contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+              contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', borderRadius: '8px' }}
               itemStyle={{ fontSize: '12px' }}
             />
           </PieChart>

@@ -108,7 +108,7 @@ export default function TopEntitiesChart({ volumeData, countData }: TopEntitiesC
               tickLine={false}
               tick={{ fill: 'var(--muted-foreground)', fontSize: 11 }}
             />
-            <Tooltip content={<CustomTooltip mode={mode} />} cursor={{ fill: 'var(--accent)', opacity: 0.1 }} />
+            <Tooltip content={<CustomTooltip mode={mode} />} cursor={{ fill: 'var(--muted)', opacity: 0.2 }} />
             <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={20}>
               {activeData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

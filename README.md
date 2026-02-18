@@ -25,7 +25,7 @@ FinPulse is intentionally designed to mirror **real world banking and fintech wo
 FinPulse follows a **Log-Centric Architecture**, where a single canonical Kafka topic serves as the immutable "Source of Truth" for all downstream analytical stores.
 
 ```mermaid
-graph LR
+graph TB
     subgraph "1. Ingestion"
         DG["Python Data Gen<br/>(Faker)"] -->|Proto-Events| K1["Kafka: raw-events"]
     end

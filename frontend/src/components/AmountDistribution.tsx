@@ -34,8 +34,8 @@ export default function AmountDistribution({ data }: AmountDistributionProps) {
             />
             <YAxis hide />
             <Tooltip 
-              cursor={{ fill: 'hsl(var(--muted)/0.2)' }}
-              contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+              cursor={{ fill: 'var(--muted)', opacity: 0.2 }}
+              contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', borderRadius: '8px' }}
               itemStyle={{ fontSize: '12px' }}
             />
             <Bar dataKey="count" radius={[4, 4, 0, 0]} barSize={40}>

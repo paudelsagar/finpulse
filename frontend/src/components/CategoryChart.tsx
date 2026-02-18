@@ -120,7 +120,7 @@ export default function CategoryChart({ data }: { data: any[] }) {
               axisLine={false}
               tickLine={false}
             />
-            <Tooltip content={<CustomTooltip mode={mode} />} cursor={{ fill: 'var(--accent)', opacity: 0.2 }} />
+            <Tooltip content={<CustomTooltip mode={mode} />} cursor={{ fill: 'var(--muted)', opacity: 0.2 }} />
             <Bar dataKey="value" radius={[0, 4, 4, 0]}>
               {latestWindowData.map((entry, index) => (
                 <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />

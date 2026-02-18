@@ -227,7 +227,12 @@ elif [ "$1" == "all" ] || [ "$1" == "start" ]; then
           "is_credit": { "type": "boolean" },
           "created_at": { "type": "date", "format": "yyyy-MM-dd HH:mm:ss||strict_date_optional_time||epoch_millis" },
           "tran_id": { "type": "keyword" },
-          "remark": { "type": "text" }
+           "remark": { 
+             "type": "text",
+             "fields": {
+               "keyword": { "type": "keyword", "ignore_above": 256 }
+             }
+           }
         }
       }
     }' 2>/dev/null

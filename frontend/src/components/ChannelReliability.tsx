@@ -43,8 +43,8 @@ export default function ChannelReliability({ data }: ChannelReliabilityProps) {
               width={80}
             />
             <Tooltip 
-              cursor={{ fill: 'hsl(var(--muted)/0.2)' }}
-              contentStyle={{ backgroundColor: 'hsl(var(--card))', borderColor: 'hsl(var(--border))', borderRadius: '8px' }}
+              cursor={{ fill: 'var(--muted)', opacity: 0.2 }}
+              contentStyle={{ backgroundColor: 'var(--card)', borderColor: 'var(--border)', borderRadius: '8px' }}
               itemStyle={{ fontSize: '12px' }}
             />
             <Legend verticalAlign="top" align="right" height={36} iconType="circle" />

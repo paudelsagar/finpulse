@@ -77,7 +77,7 @@ export default function VolumeChart({ data }: { data: any[] }) {
             tickFormatter={(value) => formatCompactNumber(value)}
             width={45}
           />
-          <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--border)', strokeWidth: 1 }} />
+          <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--muted)', strokeWidth: 1, opacity: 0.5 }} />
           <Legend 
             verticalAlign="top" 
             align="right" 

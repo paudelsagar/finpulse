@@ -15,6 +15,7 @@ export async function GET(request: Request) {
   const range = searchParams.get('range') || '15m';
   const startDate = searchParams.get('startDate') || '';
   const endDate = searchParams.get('endDate') || '';
+  const tab = searchParams.get('tab') || 'overview';
 
   // Calculate Start Time
   const now = Date.now();
@@ -71,6 +72,7 @@ export async function GET(request: Request) {
          }
       },
       aggs: {
+        // Global KPIs (Always needed)
         total_volume: { sum: { field: 'amount' } },
         active_users: { cardinality: { field: 'user_id' } },
         tps_window: {
@@ -80,135 +82,186 @@ export async function GET(request: Request) {
             }
           }
         },
-        total_liquidity: { sum: { field: 'balance' } },
-        top_accounts: {
-          terms: {
-            field: 'account_id',
-            size: 5,
-            order: { _count: "desc" }
-          }
-        },
-        top_mcc: {
-          terms: {
-            field: 'mcc_code',
-            size: 10,
-            order: { _count: "desc" }
-          }
-        },
-        amount_distribution: {
-          range: {
-            field: 'amount',
-            ranges: [
-              { to: 100, key: "Small (0-100)" },
-              { from: 100, to: 1000, key: "Medium (100-1K)" },
-              { from: 1000, to: 10000, key: "Large (1K-10K)" },
-              { from: 10000, key: "Whale (10K+)" }
-            ]
-          }
-        },
-        by_channel: { 
-          terms: { field: 'channel' },
-          aggs: {
-            statuses: {
-              terms: { field: 'tran_status' }
-            }
-          }
-        },
-        by_payment_method: { 
-          terms: { field: 'payment_method' },
-          aggs: {
-             total_volume: { sum: { field: 'amount' } }
-          }
-        },
-        by_currency: { terms: { field: 'currency' } },
-        by_status: { terms: { field: 'tran_status' } },
-        by_type: { 
-          terms: { field: 'tran_type' },
-          aggs: {
-            total_spent: { sum: { field: 'amount' } }
-          }
-        },
-        top_recipients: {
-          terms: {
-            field: 'counterparty_user_id',
-            size: 5,
-            order: { _count: "desc" },
-            missing: "Merchant/System"
-          }
-        },
-        top_merchants_by_volume: { 
-          terms: { 
-            field: 'merchant_id', 
-            size: 5,
-            order: { total_spent: "desc" }
-          },
-          aggs: {
-            total_spent: { sum: { field: 'amount' } }
-          }
-        },
-        top_merchants_by_count: { 
-          terms: { 
-            field: 'merchant_id', 
-            size: 5,
-            order: { _count: "desc" }
-          },
-          aggs: {
-            total_spent: { sum: { field: 'amount' } }
-          }
-        },
-        hourly_activity: {
-          terms: {
-            script: {
-              source: "doc['ts'].size() > 0 ? doc['ts'].value.hour : 0",
-              lang: "painless"
-            },
-            size: 24
-          }
-        },
-        volume_over_time: {
-           date_histogram: {
-             field: 'ts',
-             fixed_interval: interval
-           },
-           aggs: {
-             volume: { sum: { field: 'amount' } },
-             avg_amount: { avg: { field: 'amount' } },
-             flows: {
-               filters: {
-                 filters: {
-                   credits: { term: { is_credit: true } },
-                   debits: { term: { is_credit: false } }
-                 }
-               },
-               aggs: {
-                 volume: { sum: { field: 'amount' } }
-               }
+
+        // Overview Tab
+        ...(tab === 'overview' ? {
+             volume_over_time: {
+                date_histogram: {
+                  field: 'ts',
+                  fixed_interval: interval
+                },
+                aggs: {
+                  volume: { sum: { field: 'amount' } },
+                  avg_amount: { avg: { field: 'amount' } },
+                  statuses: {
+                    filters: {
+                      filters: {
+                        success: { term: { tran_status: 'SUCCESS' } },
+                        failed: { term: { tran_status: 'FAILED' } }
+                      }
+                    }
+                  }
+                }
              },
-             statuses: {
-               filters: {
-                 filters: {
-                   success: { term: { tran_status: 'SUCCESS' } },
-                   failed: { term: { tran_status: 'FAILED' } }
-                 }
-               }
-             }
-           }
-        },
-        by_category: {
-          terms: { field: 'merchant_category', size: 20 },
-          aggs: {
-              total_volume: { sum: { field: 'amount' } },
-              tx_count: { value_count: { field: 'tran_id' } },
-              avg_amount: { avg: { field: 'amount' } },
-              max_amount: { max: { field: 'amount' } }
-          }
-        },
-        reversal_stats: {
-          filter: { exists: { field: 'reference_tran_id' } },
-          aggs: {
-            total_reversals: { sum: { field: 'amount' } }
-          }
-        }
+             // Small Alert Fetch
+        } : {}),
+
+        // Network Health Tab
+        ...(tab === 'network' ? {
+            rail_reliability: {
+              terms: { field: 'payment_method' },
+              aggs: {
+                success_count: { filter: { term: { tran_status: 'SUCCESS' } } },
+                failed_count: { filter: { term: { tran_status: 'FAILED' } } }
+              }
+            },
+            by_channel: { 
+              terms: { field: 'channel' },
+              aggs: {
+                statuses: {
+                  terms: { field: 'tran_status' }
+                }
+              }
+            },
+            by_status: { terms: { field: 'tran_status' } },
+            by_type: { 
+              terms: { field: 'tran_type' },
+              aggs: {
+                total_spent: { sum: { field: 'amount' } }
+              }
+            },
+            reversal_stats: {
+              filter: { exists: { field: 'ref_tran_id' } },
+              aggs: {
+                total_reversals: { sum: { field: 'amount' } }
+              }
+            }
+        } : {}),
+
+        // Financials Tab
+        ...(tab === 'financials' ? {
+             volume_over_time: {
+                date_histogram: {
+                  field: 'ts',
+                  fixed_interval: interval
+                },
+                aggs: {
+                   liquidity: { sum: { field: 'balance' } },
+                   flows: {
+                    filters: {
+                      filters: {
+                        credits: { term: { is_credit: true } },
+                        debits: { term: { is_credit: false } }
+                      }
+                    },
+                    aggs: {
+                      volume: { sum: { field: 'amount' } }
+                    }
+                  }
+                }
+             },
+             amount_distribution: {
+              range: {
+                field: 'amount',
+                ranges: [
+                  { to: 100, key: "Small (0-100)" },
+                  { from: 100, to: 1000, key: "Medium (100-1K)" },
+                  { from: 1000, to: 10000, key: "Large (1K-10K)" },
+                  { from: 10000, key: "Whale (10K+)" }
+                ]
+              }
+            },
+            by_currency: { terms: { field: 'currency' } },
+            reversal_stats: {
+              filter: { exists: { field: 'ref_tran_id' } },
+              aggs: {
+                total_reversals: { sum: { field: 'amount' } }
+              }
+            }
+        } : {}),
+
+        // Demographics Tab
+        ...(tab === 'demographics' ? {
+             volume_over_time: {
+                date_histogram: {
+                  field: 'ts',
+                  fixed_interval: interval
+                },
+                aggs: {
+                   active_users: { cardinality: { field: 'user_id' } }
+                }
+             },
+             top_mcc: {
+              terms: {
+                field: 'mcc_code',
+                size: 10,
+                order: { _count: "desc" }
+              },
+              aggs: {
+                 avg_amount: { avg: { field: 'amount' } },
+                 total_volume: { sum: { field: 'amount' } }
+              }
+            },
+            top_recipients: {
+              terms: {
+                field: 'counterparty_user_id',
+                size: 5,
+                order: { _count: "desc" },
+                missing: "Merchant/System"
+              }
+            },
+            top_accounts: {
+              terms: {
+                field: 'account_id',
+                size: 5,
+                order: { _count: "desc" }
+              }
+            }
+        } : {}),
+
+        // Executive Tab
+        ...(tab === 'executive' ? {
+             merchant_integrity: {
+              terms: { field: 'merchant_id', size: 50 },
+              aggs: {
+                total_volume: { sum: { field: 'amount' } },
+                success_count: { filter: { term: { tran_status: 'SUCCESS' } } }
+              }
+            },
+            by_type: { 
+              terms: { field: 'tran_type' },
+              aggs: {
+                total_spent: { sum: { field: 'amount' } }
+              }
+            },
+            top_remarks: {
+              terms: { 
+                field: 'remark.keyword', 
+                size: 15,
+                exclude: [".*", "payment", "for", "the", "and", "with", "from"] 
+              }
+            },
+            top_merchants_by_volume: { 
+              terms: { 
+                field: 'merchant_id', 
+                size: 5,
+                order: { total_spent: "desc" }
+              },
+              aggs: {
+                total_spent: { sum: { field: 'amount' } }
+              }
+            },
+            top_merchants_by_count: { 
+              terms: { 
+                field: 'merchant_id', 
+                size: 5,
+                order: { _count: "desc" }
+              },
+              aggs: {
+                total_spent: { sum: { field: 'amount' } }
+              }
+            }
+        } : {})
       }
     });
 
@@ -258,7 +311,7 @@ export async function GET(request: Request) {
       total_count: (aggs.hits.total as any).value || 0,
       active_users: aggregations.active_users?.value || 0,
       tps: parseFloat(tps.toFixed(2)),
-      last_event_ts: recentTx.hits.hits[0]?._source?.ts || null,
+      last_event_ts: (recentTx.hits.hits[0]?._source as any)?.ts || null,
       category_stats: formattedCatStats,
       alerts: highValueAlerts.hits.hits.map(h => h._source)
     });

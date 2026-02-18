@@ -58,30 +58,35 @@ export default function TransactionList({ transactions }: { transactions: any[] 
 
   return (
     <div className="bg-card border border-border rounded-xl shadow-sm overflow-hidden h-full flex flex-col min-h-[500px]">
-      <div className="p-6 border-b border-border flex items-center justify-between bg-card/50">
-        <div>
-          <h3 className="text-lg font-bold text-foreground uppercase tracking-tight">Transaction Ledger</h3>
-          <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest">Real-time Activity Stream</p>
+      <div className="p-6 border-b border-border flex items-center justify-between bg-card">
+        <div className="flex flex-col gap-1">
+          <h3 className="text-lg font-bold text-foreground tracking-tight flex items-center gap-2">
+            Transaction Ledger
+            <span className="px-2 py-0.5 rounded-full bg-muted text-[10px] font-black text-muted-foreground uppercase tracking-widest border border-border">
+              {transactions.length} Events
+            </span>
+          </h3>
+          <p className="text-xs text-muted-foreground font-medium">Real-time financial activity stream</p>
         </div>
-        <div className="flex items-center gap-2 px-2 py-1 rounded bg-primary/10 border border-primary/20">
-          <span className="relative flex h-1.5 w-1.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-primary"></span>
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20">
+          <span className="relative flex h-2 w-2">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
           </span>
-          <span className="text-[10px] font-black text-primary uppercase tracking-widest">Live</span>
+          <span className="text-[10px] font-black text-emerald-600 uppercase tracking-widest">Live Feed</span>
         </div>
       </div>
       
       <div className="flex-1 overflow-auto custom-scrollbar">
-        <table className="w-full text-left border-separate border-spacing-0">
-          <thead className="sticky top-0 bg-muted/80 backdrop-blur-md z-10 border-b border-border">
+        <table className="w-full text-left border-collapse">
+          <thead className="sticky top-0 bg-muted/40 backdrop-blur-md z-10 border-b border-border">
             <tr>
-              <th className="px-5 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-b border-border">ID / Time</th>
-              <th className="px-5 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-b border-border">Parties</th>
-              <th className="px-5 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-b border-border">Category / Rail</th>
-              <th className="px-5 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center border-b border-border">Channel</th>
-              <th className="px-5 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-right border-b border-border">Value</th>
-              <th className="px-5 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest text-center border-b border-border">Status</th>
+              <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-b border-border w-[140px]">Timestamp / ID</th>
+              <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-b border-border">Entities</th>
+              <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-b border-border">Type / Category</th>
+              <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-b border-border text-center">Channel</th>
+              <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-b border-border text-right">Amount</th>
+              <th className="px-6 py-4 text-[10px] font-black text-muted-foreground uppercase tracking-widest border-b border-border text-right">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-border/50">
@@ -91,71 +96,90 @@ export default function TransactionList({ transactions }: { transactions: any[] 
               const recipient = isP2P ? tx.counterparty_user_id : (tx.merchant_id || tx.counterparty_user_id || 'System');
               
               return (
-                <tr key={`${tx.tran_id}-${idx}`} className="hover:bg-accent/30 transition-colors duration-100 group">
-                  <td className="px-5 py-3 align-middle">
-                    <div className="flex flex-col">
-                      <span className="font-mono text-[10px] font-bold text-foreground truncate w-24" title={tx.tran_id}>{tx.tran_id}</span>
-                      <span className="text-[9px] font-medium text-muted-foreground/60">{new Date(tx.ts).toLocaleTimeString()}</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3 align-middle">
-                    <div className="flex flex-col gap-0.5">
-                      <div className="flex items-center gap-1.5 group/sender">
-                        <span className="text-[9px] font-black text-primary/80 uppercase tracking-tighter w-3">S:</span>
-                        <div className="flex flex-col">
-                          <span className="text-xs font-mono font-bold text-foreground truncate max-w-[120px]">{sender}</span>
-                          <span className="text-[7px] font-mono text-muted-foreground/40 hidden group-hover/sender:block">{tx.account_id}</span>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-1.5 group/recip">
-                        <span className="text-[9px] font-black text-muted-foreground uppercase tracking-tighter w-3">R:</span>
-                        <div className="flex flex-col">
-                          <span className="text-xs font-mono font-bold text-foreground truncate max-w-[120px]">{recipient}</span>
-                          <span className="text-[7px] font-mono text-muted-foreground/40 hidden group-hover/recip:block">{tx.counterparty_account_id}</span>
-                        </div>
-                      </div>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3 align-middle">
+                <tr key={`${tx.tran_id}-${idx}`} className="hover:bg-muted/30 transition-colors duration-150 group">
+                  <td className="px-6 py-4 align-top">
                     <div className="flex flex-col gap-1">
-                      <div className="flex items-center gap-1.5 px-1.5 py-0.5 rounded-sm bg-muted/40 w-fit">
+                      <span className="text-xs font-bold text-foreground tabular-nums">
+                        {new Date(tx.ts).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </span>
+                      <span className="font-mono text-[9px] text-muted-foreground/60 truncate w-24 select-all cursor-pointer hover:text-primary transition-colors" title="Click to copy ID">
+                        {tx.tran_id}
+                      </span>
+                    </div>
+                  </td>
+                  
+                  <td className="px-6 py-4 align-top">
+                    <div className="flex flex-col gap-2">
+                      <div className="flex items-center gap-2 group/sender">
+                        <div className="w-5 h-5 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20 shrink-0">
+                          <ArrowUpRight size={10} className="text-red-500" />
+                        </div>
+                        <div className="flex flex-col overflow-hidden">
+                          <span className="text-xs font-semibold text-foreground truncate">{sender}</span>
+                          <span className="text-[9px] font-mono text-muted-foreground/50 truncate">Account: {tx.account_id}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="w-px h-2 bg-border ml-2.5 my-[-4px]" />
+                      
+                      <div className="flex items-center gap-2 group/recip">
+                         <div className="w-5 h-5 rounded-full bg-emerald-500/10 flex items-center justify-center border border-emerald-500/20 shrink-0">
+                          <ArrowUpRight size={10} className="text-emerald-500 rotate-180" />
+                        </div>
+                        <div className="flex flex-col overflow-hidden">
+                          <span className="text-xs font-semibold text-foreground truncate">{recipient}</span>
+                          <span className="text-[9px] font-mono text-muted-foreground/50 truncate">Account: {tx.counterparty_account_id}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                  
+                  <td className="px-6 py-4 align-top">
+                    <div className="flex flex-col gap-2 items-start">
+                       <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-muted/50 border border-border/50">
                         {getIcon(tx.merchant_category)}
-                        <span className="text-[10px] font-black text-foreground/70 uppercase tracking-tight">
+                        <span className="text-[10px] font-bold text-foreground/80 uppercase tracking-tight">
                           {tx.merchant_category || 'Transfer'}
-                          {tx.mcc_code && <span className="ml-1 opacity-40 font-mono text-[8px]">#{tx.mcc_code}</span>}
                         </span>
                       </div>
-                      <div className="flex items-center gap-1 px-1.5 py-0.5 border border-border w-fit rounded-sm bg-background/50">
-                         <span className="text-[9px] font-black uppercase text-muted-foreground/60 tracking-wider text-[8px]">{tx.payment_method}</span>
-                      </div>
+                      {tx.mcc_code && (
+                         <span className="text-[9px] font-mono text-muted-foreground/60 px-1">MCC: {tx.mcc_code}</span>
+                      )}
                     </div>
                   </td>
-                  <td className="px-5 py-3 align-middle text-center">
-                    <span className="inline-block text-[9px] font-black text-muted-foreground uppercase tracking-widest py-1 px-2 rounded-md border border-border bg-muted/20">
+                  
+                  <td className="px-6 py-4 align-top text-center">
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-md border border-border bg-background text-[10px] font-bold text-muted-foreground uppercase tracking-wider shadow-sm">
                       {tx.channel}
                     </span>
                   </td>
-                  <td className="px-5 py-3 text-right align-middle">
-                    <div className="flex flex-col items-end">
-                      <span className={`text-sm font-mono font-bold tracking-tight ${tx.is_credit ? 'text-emerald-500' : 'text-foreground'}`}>
-                        {tx.is_credit ? '+' : '-'}{formatCurrency(tx.amount)}
+                  
+                  <td className="px-6 py-4 align-top text-right">
+                    <div className="flex flex-col gap-0.5">
+                      <span className={`text-sm font-bold tracking-tight tabular-nums ${tx.is_credit ? 'text-emerald-600' : 'text-foreground'}`}>
+                        {tx.is_credit ? '+' : ''}{formatCurrency(tx.amount)}
                       </span>
-                      <span className="text-[10px] font-bold text-muted-foreground/40 uppercase">{tx.currency}</span>
+                      <span className="text-[9px] font-bold text-muted-foreground/40 uppercase">{tx.currency}</span>
                     </div>
                   </td>
-                  <td className="px-5 py-3 text-center align-middle">
-                     <div className="flex flex-col items-center gap-1">
-                       <span className={`text-[9px] font-black px-2 py-0.5 rounded-full border flex items-center gap-1 ${
-                          tx.tran_status === 'SUCCESS' ? 'text-emerald-500 bg-emerald-500/10 border-emerald-500/20' :
-                          tx.tran_status === 'PENDING' ? 'text-amber-500 bg-amber-500/10 border-amber-500/20' : 
-                          'text-rose-500 bg-rose-500/10 border-rose-500/20'
+                  
+                  <td className="px-6 py-4 align-top text-right">
+                     <div className="flex flex-col items-end gap-1">
+                       <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-bold border ${
+                          tx.tran_status === 'SUCCESS' ? 'bg-emerald-500/5 text-emerald-600 border-emerald-500/20' :
+                          tx.tran_status === 'PENDING' ? 'bg-amber-500/5 text-amber-600 border-amber-500/20' : 
+                          'bg-rose-500/5 text-rose-600 border-rose-500/20'
                        }`}>
-                         {tx.ref_tran_id && <div className="w-1 h-1 rounded-full bg-current animate-pulse" title="Referenced/Reversal" />}
+                         <span className={`w-1.5 h-1.5 rounded-full ${
+                            tx.tran_status === 'SUCCESS' ? 'bg-emerald-500' :
+                            tx.tran_status === 'PENDING' ? 'bg-amber-500 animate-pulse' : 
+                            'bg-rose-500'
+                         }`} />
                          {tx.tran_status}
                        </span>
                        {tx.remark && (
-                         <span className="text-[9px] text-muted-foreground/60 italic truncate max-w-[100px] font-medium" title={tx.remark}>
-                           "{tx.remark}"
+                         <span className="text-[9px] text-muted-foreground/50 italic max-w-[100px] truncate">
+                           {tx.remark}
                          </span>
                        )}
                      </div>
@@ -167,7 +191,10 @@ export default function TransactionList({ transactions }: { transactions: any[] 
         </table>
       </div>
       <div className="p-4 bg-muted/20 border-t border-border flex justify-center">
-         <button className="text-[10px] font-black text-primary/70 uppercase tracking-widest hover:text-primary transition-colors">View Complete Audit Log →</button>
+         <button className="text-[10px] font-black text-primary/70 uppercase tracking-widest hover:text-primary transition-colors flex items-center gap-1 group">
+           View Complete Audit Log 
+           <span className="group-hover:translate-x-0.5 transition-transform">→</span>
+         </button>
       </div>
     </div>
   );

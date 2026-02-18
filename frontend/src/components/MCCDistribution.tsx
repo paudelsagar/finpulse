@@ -32,7 +32,7 @@ export default function MCCDistribution({ data }: MCCDistributionProps) {
             axisLine={false}
           />
           <Tooltip 
-            cursor={{ fill: 'var(--primary)', opacity: 0.05 }}
+            cursor={{ fill: 'var(--muted)', opacity: 0.2 }}
             content={({ active, payload }: any) => {
               if (active && payload && payload.length) {
                 return (
