@@ -8,7 +8,6 @@ data into multiple Elasticsearch indices for downstream visualization.
 
 import json
 import os
-import sys
 
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.table import EnvironmentSettings, StreamTableEnvironment
@@ -45,7 +44,8 @@ class FlinkProcessor:
         self.env = None
         self.t_env = None
         self.kafka_servers = os.environ.get("KAFKA_BOOTSTRAP_SERVERS", "kafka:29092")
-        self.kafka_topic = os.environ.get("KAFKA_TOPIC", "fin-v1")
+        self.kafka_topic = os.environ.get("KAFKA_TOPIC", "fin-transaction")
+        self.normalized_topic = f"{self.kafka_topic}-normalized"
         self.es_hosts = os.environ.get(
             "ELASTICSEARCH_HOSTS", "http://elasticsearch:9200"
         )
@@ -75,7 +75,6 @@ class FlinkProcessor:
         es_jar = os.environ.get(
             "ES_JAR", "flink-sql-connector-elasticsearch7-3.0.1-1.17.jar"
         )
-
         jar_path = f"file:///opt/flink/lib_extra/{kafka_jar};file:///opt/flink/lib_extra/{es_jar}"
 
         self.t_env.get_config().get_configuration().set_string(
@@ -134,10 +133,10 @@ class FlinkProcessor:
         Creates a table named 'transactions' that consumes JSON data from
         the configured Kafka topic.
         """
-        # 3. Define Source Table (Kafka) - MATCHING main_future.py Schema
+        # 3. Define Raw Source Table (Kafka) - Source of truth
         self.t_env.execute_sql(
             """
-            CREATE TABLE transactions (
+            CREATE TABLE raw_transactions (
                 tran_id STRING,
                 tran_date STRING,
                 user_id STRING,
@@ -164,7 +163,7 @@ class FlinkProcessor:
                 'connector' = 'kafka',
                 'topic' = '{kafka_topic}',
                 'properties.bootstrap.servers' = '{kafka_servers}',
-                'properties.group.id' = 'flink-processor-group-v3',
+                'properties.group.id' = 'flink-processor-producer-group',
                 'scan.startup.mode' = 'earliest-offset',
                 'format' = 'json',
                 'json.fail-on-missing-field' = 'false',
@@ -172,6 +171,45 @@ class FlinkProcessor:
             )
         """.format(
                 kafka_servers=self.kafka_servers, kafka_topic=self.kafka_topic
+            )
+        )
+
+        # 3.1 Define Normalized Source Table (Kafka) - Consumer source for ES
+        self.t_env.execute_sql(
+            """
+            CREATE TABLE normalized_source (
+                tran_id STRING,
+                tran_date STRING,
+                user_id STRING,
+                account_id STRING,
+                counterparty_user_id STRING,
+                counterparty_account_id STRING,
+                merchant_id STRING,
+                merchant_category STRING,
+                mcc_code STRING,
+                tran_type STRING,
+                payment_method STRING,
+                amount DECIMAL(12, 2),
+                balance DECIMAL(12, 2),
+                currency STRING,
+                remark STRING,
+                channel STRING,
+                tran_status STRING,
+                ref_tran_id STRING,
+                is_credit BOOLEAN,
+                created_at STRING,
+                ts TIMESTAMP(3),
+                WATERMARK FOR ts AS ts - INTERVAL '5' SECOND
+            ) WITH (
+                'connector' = 'kafka',
+                'topic' = '{normalized_topic}',
+                'properties.bootstrap.servers' = '{kafka_servers}',
+                'properties.group.id' = 'flink-processor-es-consumer-group',
+                'scan.startup.mode' = 'earliest-offset',
+                'format' = 'json'
+            )
+        """.format(
+                kafka_servers=self.kafka_servers, normalized_topic=self.normalized_topic
             )
         )
 
@@ -211,7 +249,7 @@ class FlinkProcessor:
             CREATE TEMPORARY VIEW canonical_transactions AS
             SELECT 
                 {select_stmt}
-            FROM transactions
+            FROM raw_transactions
             """
         )
 
@@ -331,39 +369,74 @@ class FlinkProcessor:
             )
         )
 
+        # 9. Define Sink Table (Kafka Bridge for ClickHouse)
+        # Sinks normalized data to a new topic which ClickHouse consumes natively
+        self.t_env.execute_sql(
+            """
+            CREATE TABLE kafka_normalized (
+                tran_id STRING,
+                tran_date STRING,
+                user_id STRING,
+                account_id STRING,
+                counterparty_user_id STRING,
+                counterparty_account_id STRING,
+                merchant_id STRING,
+                merchant_category STRING,
+                mcc_code STRING,
+                tran_type STRING,
+                payment_method STRING,
+                amount DECIMAL(12, 2),
+                balance DECIMAL(12, 2),
+                currency STRING,
+                remark STRING,
+                channel STRING,
+                tran_status STRING,
+                ref_tran_id STRING,
+                is_credit BOOLEAN,
+                created_at STRING,
+                ts TIMESTAMP(3)
+            ) WITH (
+                'connector' = 'kafka',
+                'topic' = '{normalized_topic}',
+                'properties.bootstrap.servers' = '{kafka_servers}',
+                'format' = 'json'
+            )
+        """.format(
+                kafka_servers=self.kafka_servers, normalized_topic=self.normalized_topic
+            )
+        )
+
     def _define_pipelines(self):
         """
         Define the data processing pipelines.
         """
         statement_set = self.t_env.create_statement_set()
 
-        # 9. Insert Statements
+        # --- PHASE 1: Producer (Normalize -> Kafka) ---
+        statement_set.add_insert_sql(
+            """
+            INSERT INTO kafka_normalized
+            SELECT 
+                tran_id, tran_date, user_id, account_id, counterparty_user_id,
+                counterparty_account_id, merchant_id, merchant_category, mcc_code,
+                tran_type, payment_method, amount, balance, currency, remark,
+                channel, tran_status, ref_tran_id, is_credit, created_at, ts
+            FROM canonical_transactions
+        """
+        )
+
+        # --- PHASE 2: Consumer (Kafka -> Elasticsearch) ---
+        # All ES sinks now read from 'normalized_source' instead of 'canonical_transactions'
+
         statement_set.add_insert_sql(
             """
             INSERT INTO es_transactions
             SELECT 
-                tran_id,
-                tran_date,
-                user_id,
-                account_id,
-                counterparty_user_id,
-                counterparty_account_id,
-                merchant_id,
-                merchant_category,
-                mcc_code,
-                tran_type,
-                payment_method,
-                amount,
-                balance,
-                currency,
-                remark,
-                channel,
-                tran_status,
-                ref_tran_id,
-                is_credit,
-                created_at,
-                ts
-            FROM canonical_transactions
+                tran_id, tran_date, user_id, account_id, counterparty_user_id,
+                counterparty_account_id, merchant_id, merchant_category, mcc_code,
+                tran_type, payment_method, amount, balance, currency, remark,
+                channel, tran_status, ref_tran_id, is_credit, created_at, ts
+            FROM normalized_source
         """
         )
 
@@ -371,18 +444,12 @@ class FlinkProcessor:
             """
             INSERT INTO es_high_value
             SELECT 
-                tran_id,
-                user_id,
-                amount,
-                tran_date
-            FROM canonical_transactions
+                tran_id, user_id, amount, tran_date
+            FROM normalized_source
             WHERE amount > 10000
         """
         )
 
-        # Flow Logic:
-        # Debit the user_id
-        # Credit the counterparty (Merchant or User)
         statement_set.add_insert_sql(
             """
             INSERT INTO es_entity_flows
@@ -392,7 +459,7 @@ class FlinkProcessor:
                 'DEBIT', 
                 tran_date, 
                 tran_id
-            FROM canonical_transactions
+            FROM normalized_source
             UNION ALL
             SELECT 
                 COALESCE(merchant_id, counterparty_user_id) as entity_id, 
@@ -400,7 +467,7 @@ class FlinkProcessor:
                 'CREDIT', 
                 tran_date, 
                 tran_id
-            FROM canonical_transactions
+            FROM normalized_source
             WHERE COALESCE(merchant_id, counterparty_user_id) IS NOT NULL
         """
         )
@@ -414,7 +481,7 @@ class FlinkProcessor:
                 COUNT(*) as tx_count,
                 AVG(amount) as avg_amount,
                 COUNT(DISTINCT user_id) as unique_users
-            FROM canonical_transactions
+            FROM normalized_source
             GROUP BY TUMBLE(ts, INTERVAL '1' DAY)
         """
         )
@@ -428,7 +495,7 @@ class FlinkProcessor:
                 COUNT(*) as tx_count,
                 AVG(amount) as avg_amount,
                 COUNT(DISTINCT user_id) as unique_users
-            FROM canonical_transactions
+            FROM normalized_source
             GROUP BY TUMBLE(ts, INTERVAL '30' DAY)
         """
         )

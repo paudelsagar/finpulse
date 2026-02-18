@@ -1,9 +1,13 @@
+import { queryClickHouse } from '@/lib/clickhouse';
 import { formatLocalDate } from '@/lib/utils';
 import { Client } from '@elastic/elasticsearch';
 import { NextResponse } from 'next/server';
 
+const esPort = process.env.ES_PORT || '9200';
+const esUrl = process.env.ELASTICSEARCH_URL || `http://127.0.0.1:${esPort}`;
+
 const client = new Client({
-  node: process.env.ELASTICSEARCH_URL || 'http://127.0.0.1:9200'
+  node: esUrl
 });
 
 export async function GET(request: Request) {
@@ -233,6 +237,21 @@ export async function GET(request: Request) {
 
     const tps = (aggregations.tps_window?.doc_count || 0) / 60;
 
+    // 5. IF range >= 30d, supplement with ClickHouse for deep history (Optional refinement)
+    // For now, we use ES as primary, but if the range is '365d' or 'all', 
+    // we could swap specific aggregations here.
+    if (range === '365d' || range === 'all') {
+       try {
+         const chStats = await getStatsFromClickHouse(localStart, localEnd, interval);
+         // Merge or overwrite specific expensive stats
+         if (aggregations.volume_over_time) {
+            aggregations.volume_over_time.buckets = chStats.volume_over_time;
+         }
+       } catch (e) {
+         console.error("ClickHouse supplement failed, falling back to ES only:", e);
+       }
+    }
+
     return NextResponse.json({
       recent: recentTx.hits.hits.map(h => h._source),
       stats: aggregations,
@@ -254,4 +273,29 @@ export async function GET(request: Request) {
         error: "Failed to fetch from ES" 
     }, { status: 500 });
   }
+}
+
+async function getStatsFromClickHouse(start: string, end: string, interval: string) {
+  // Map Flink interval to ClickHouse toStartOf* functions
+  let timeFunc = 'toStartOfMinute';
+  if (interval.includes('h')) timeFunc = 'toStartOfHour';
+  if (interval.includes('d')) timeFunc = 'toStartOfDay';
+
+  const query = `
+    SELECT 
+        ${timeFunc}(ts) as key_as_string,
+        sum(amount) as volume
+    FROM transactions
+    WHERE ts >= '${start}' AND ts <= '${end}'
+    GROUP BY key_as_string
+    ORDER BY key_as_string ASC
+  `;
+  
+  const rows = await queryClickHouse<any>(query);
+  return {
+    volume_over_time: rows.map((r: { key_as_string: string; volume: string }) => ({
+      key_as_string: r.key_as_string,
+      volume: { value: parseFloat(r.volume) }
+    }))
+  };
 }

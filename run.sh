@@ -40,6 +40,30 @@ function wait_for_kafka {
     echo "Kafka is up."
 }
 
+function wait_for_clickhouse {
+    echo "Waiting for ClickHouse to be ready..."
+    MAX_RETRIES=30
+    COUNT=0
+    until curl -s http://localhost:8123/ping | grep -q "Ok" || [ $COUNT -eq $MAX_RETRIES ]; do
+        sleep 2
+        COUNT=$((COUNT + 1))
+    done
+    if [ $COUNT -eq $MAX_RETRIES ]; then echo "ClickHouse Timeout"; exit 1; fi
+    echo "ClickHouse is up."
+}
+
+function wait_for_flink {
+    echo "Waiting for Flink JobManager to be ready..."
+    MAX_RETRIES=30
+    COUNT=0
+    until curl -s http://localhost:8081 >/dev/null || [ $COUNT -eq $MAX_RETRIES ]; do
+        sleep 2
+        COUNT=$((COUNT + 1))
+    done
+    if [ $COUNT -eq $MAX_RETRIES ]; then echo "Flink Timeout"; exit 1; fi
+    echo "Flink JobManager is up."
+}
+
 
 function show_help {
     echo "Realtime Analytics Manager"
@@ -87,7 +111,7 @@ elif [ "$1" == "stop" ]; then
     echo "Stopping components..."
     
     stop_process "pids/datagen.pid" "Data Generator" "main.py"
-    stop_process "pids/datagen.pid" "Backfill Generator" "backfill.py"
+    stop_process "pids/backfill.pid" "Backfill Generator" "backfill.py"
     stop_process "pids/frontend.pid" "Dashboard" "next-server"
 
     echo "Stopping Docker Infrastructure..."
@@ -123,11 +147,31 @@ elif [ "$1" == "gen" ]; then
         source venv/bin/activate
     fi
 
-    # Run in background
-    nohup python3 -u main.py > ../../logs/datagen.log 2>&1 &
+    # Run in background with host-reachable broker
+    nohup env KAFKA_BROKER=localhost:9092 python3 -u main.py > logs/datagen.log 2>&1 &
     PID=$!
     echo $PID > ../../pids/datagen.pid
     echo "Data Generator started (PID: $PID). Logs: logs/datagen.log"
+    cd ../..
+
+elif [ "$1" == "backfill" ]; then
+    echo "Starting Backfill Generator (Background)..."
+    cd backend/datagen
+    
+    # Activate venv if needed
+    if [ ! -d "venv" ]; then
+        python3 -m venv venv
+        source venv/bin/activate
+        pip install -r requirements.txt
+    else
+        source venv/bin/activate
+    fi
+
+    # Run in background with host-reachable broker
+    nohup env KAFKA_BROKER=localhost:9092 python3 -u backfill.py > logs/backfill.log 2>&1 &
+    PID=$!
+    echo $PID > ../../pids/backfill.pid
+    echo "Backfill Generator started (PID: $PID). Logs: logs/backfill.log"
     cd ../..
 
 elif [ "$1" == "ui" ]; then
@@ -142,12 +186,20 @@ elif [ "$1" == "ui" ]; then
     cd ..
 
 elif [ "$1" == "all" ] || [ "$1" == "start" ]; then
+    # Ensure Jars exist
+    if [ ! "$(ls -A jars/*.jar 2>/dev/null)" ]; then
+        echo "Flink Jars missing. Downloading..."
+        python3 download_jars.py
+    fi
+
     $0 infra
     wait_for_es
     wait_for_kafka
+    wait_for_flink
     
     echo "Preparing Kafka topics..."
     docker exec kafka kafka-topics --create --if-not-exists --topic ${KAFKA_TOPIC:-fin-v1} --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
+    docker exec kafka kafka-topics --create --if-not-exists --topic ${KAFKA_TOPIC:-fin-v1}-normalized --bootstrap-server localhost:9092 --partitions 1 --replication-factor 1
     
     echo "Preparing Elasticsearch indices..."
     # Transactions Index
@@ -235,6 +287,73 @@ elif [ "$1" == "all" ] || [ "$1" == "start" ]; then
       }
     }' 2>/dev/null
     
+    wait_for_clickhouse
+
+    echo "Preparing ClickHouse tables..."
+    # Create finpulse database and transactions table
+    docker exec clickhouse clickhouse-client --query "CREATE DATABASE IF NOT EXISTS finpulse"
+    docker exec clickhouse clickhouse-client --query "
+    CREATE TABLE IF NOT EXISTS finpulse.transactions (
+        tran_id String,
+        tran_date String,
+        user_id String,
+        account_id String,
+        counterparty_user_id String,
+        counterparty_account_id String,
+        merchant_id String,
+        merchant_category String,
+        mcc_code String,
+        tran_type String,
+        payment_method String,
+        amount Decimal(12, 2),
+        balance Decimal(12, 2),
+        currency String,
+        remark String,
+        channel String,
+        tran_status String,
+        ref_tran_id String,
+        is_credit UInt8,
+        created_at String,
+        ts DateTime64(3)
+    ) ENGINE = MergeTree()
+    ORDER BY (ts, tran_id)"
+
+    # Create Kafka Engine Table
+    docker exec clickhouse clickhouse-client --query "
+    CREATE TABLE IF NOT EXISTS finpulse.kafka_transactions (
+        tran_id String,
+        tran_date String,
+        user_id String,
+        account_id String,
+        counterparty_user_id String,
+        counterparty_account_id String,
+        merchant_id String,
+        merchant_category String,
+        mcc_code String,
+        tran_type String,
+        payment_method String,
+        amount Decimal(12, 2),
+        balance Decimal(12, 2),
+        currency String,
+        remark String,
+        channel String,
+        tran_status String,
+        ref_tran_id String,
+        is_credit UInt8,
+        created_at String,
+        ts DateTime64(3)
+    ) ENGINE = Kafka
+    SETTINGS kafka_broker_list = '${KAFKA_BOOTSTRAP_SERVERS:-kafka:29092}',
+             kafka_topic_list = '${KAFKA_TOPIC:-fin-v1}-normalized',
+             kafka_group_name = 'clickhouse-group',
+             kafka_format = 'JSONEachRow',
+             kafka_num_consumers = 1"
+
+    # Create Materialized View to sync Kafka -> Transactions
+    docker exec clickhouse clickhouse-client --query "
+    CREATE MATERIALIZED VIEW IF NOT EXISTS finpulse.kafka_to_transactions TO finpulse.transactions AS
+    SELECT * FROM finpulse.kafka_transactions"
+
     echo ""
     
     $0 job
@@ -259,7 +378,7 @@ elif [ "$1" == "status" ]; then
 
     echo ""
     echo "Docker Containers:"
-    docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "flink|kafka|es|zoo"
+    docker ps --format "table {{.Names}}\t{{.Status}}" | grep -E "flink|kafka|es|zoo|clickhouse"
 
 elif [ "$1" == "logs" ]; then
     if [ "$2" == "gen" ]; then

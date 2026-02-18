@@ -4,13 +4,14 @@ import random
 import time
 import uuid
 from datetime import datetime
-from decimal import Decimal
 
 from faker import Faker
 from kafka import KafkaProducer
 
 # Configuration
-KAFKA_BROKER = os.getenv("KAFKA_BROKER", "localhost:9092")
+KAFKA_BROKER = os.getenv(
+    "KAFKA_BROKER", os.getenv("KAFKA_BOOTSTRAP_SERVERS", "localhost:9092")
+)
 TOPIC_NAME = os.getenv("KAFKA_TOPIC", "fin-transaction")
 SLEEP_TIME = float(os.getenv("SLEEP_TIME", "0.01"))
 BATCH_SIZE = int(os.getenv("BATCH_SIZE", "50"))
@@ -185,7 +186,8 @@ USER_BALANCES = {u: round(random.uniform(1000, 50000), 2) for u in USERS}
 
 def create_producer():
     attempt = 0
-    while attempt < 10:
+    max_attempts = 30
+    while attempt < max_attempts:
         try:
             producer = KafkaProducer(
                 bootstrap_servers=[KAFKA_BROKER],

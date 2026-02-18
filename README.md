@@ -22,47 +22,55 @@ FinPulse is intentionally designed to mirror **real world banking and fintech wo
 
 ## Architecture
 
+FinPulse follows a **Log-Centric Architecture**, where a single canonical Kafka topic serves as the immutable "Source of Truth" for all downstream analytical stores.
+
 ```mermaid
-graph TD
-    subgraph "Data Sources"
-        DG["Python Data Generator<br/>(Faker)"]
+graph LR
+    subgraph "1. Ingestion"
+        DG["Python Data Gen<br/>(Faker)"] -->|Proto-Events| K1["Kafka: raw-events"]
     end
 
-    subgraph "Messaging Layer"
-        K["Apache Kafka<br/>(Topic: fin-transaction)"]
+    subgraph "2. Transformation (Flink)"
+        K1 --> F1["Flink Transformer"]
+        F1 -->|Canonical Sync| K2["Kafka: Truth Log<br/>(Source of Truth)"]
     end
 
-    subgraph "Stream Processing Layer"
-        F["Apache Flink<br/>(Stateful Stream Processing)"]
-        W["Window Aggregations<br/>(Tumbling & Sliding)"]
-        F --> W
+    subgraph "3. Storage & Convergence"
+        %% ClickHouse Path
+        K2 -->|Kafka Engine| CH_K["CH: Kafka Engine"]
+        CH_K -->|Materialized View Sync| CH_T[("ClickHouse<br/>(Historical OLAP)")]
+
+        %% ES Path
+        K2 --> F2["Flink Consuming Job"]
+        F2 -->|Real-time Sink| ES_R[("Elasticsearch<br/>(Search Hub)")]
+        
+        subgraph "Analytical Rollups"
+            F2 -->|1d Tumble| ES_D[("ES: Daily Stats")]
+            F2 -->|30d Tumble| ES_M[("ES: Monthly Stats")]
+        end
     end
 
-    subgraph "Storage Layer"
-        ES1[("Elasticsearch<br/>Idx: es_transactions")]
-        ES2[("Elasticsearch<br/>Idx: es_daily_stats")]
-        ES3[("Elasticsearch<br/>Idx: es_monthly_stats")]
-        ES4[("Elasticsearch<br/>Idx: es_high_value")]
+    subgraph "4. Application Hub"
+        API{"Hybrid API Router"}
+        UI["Next.js Dashboard"]
+
+        API -.->|History >= 30d| CH_T
+        API -.->|Search < 30d| ES_R
+        API -.->|Global Trends| ES_D & ES_M
+        
+        UI <-->|SWR Polling| API
     end
 
-    subgraph "Application Layer"
-        API["Next.js API Routes<br/>(Backend)"]
-        UI["Next.js Dashboard<br/>(Frontend)"]
-    end
+    %% Redesigned Styles
+    classDef Truth fill:#f96,stroke:#333,stroke-width:4px,color:#fff;
+    classDef Router fill:#f9f,stroke:#333,stroke-width:2px;
+    classDef Storage fill:#e1f5fe,stroke:#01579b,stroke-width:2px;
+    classDef Processor fill:#fff9c4,stroke:#fbc02d,stroke-width:2px;
 
-    DG -->|JSON Events| K
-    K -->|Consume Stream| F
-    W -->|Sink Raw Data| ES1
-    W -->|Sink Rollups| ES2
-    W -->|Sink Rollups| ES3
-    W -->|Sink Alerts| ES4
-    
-    ES1 -.->|Query| API
-    ES2 -.->|Query| API
-    ES3 -.->|Query| API
-    ES4 -.->|Query| API
-    
-    API <-->|REST / SWR| UI
+    class K2 Truth;
+    class API Router;
+    class CH_T,ES_R,ES_D,ES_M Storage;
+    class F1,F2 Processor;
 ```
 
 
@@ -79,7 +87,8 @@ graph TD
 | **Backend API** | Next.js API | 14 | Serverless functions for Elasticsearch queries. |
 | **Stream Processing** | Apache Flink | 1.18 | Stateful stream processing and windowed aggregations. |
 | **Messaging** | Apache Kafka | 7.5 | High-throughput distributed event streaming. |
-| **Storage** | Elasticsearch | 7.17 | Search engine and analytics store. |
+| **Storage (OLTP/Real-time)** | Elasticsearch | 7.17 | Search engine and real-time analytics store. |
+| **Storage (OLAP/History)** | ClickHouse | 23.8 | High-performance column-oriented store for long-term analytics. |
 | **Data Gen** | Python | 3.11 | Synthetic financial transaction generator using Faker. |
 
 
@@ -88,25 +97,40 @@ graph TD
 
 
 
-### Data Pipeline Flow
+### 1. The "Truth Log" Pattern
+At the core of FinPulse is a **Log-Centric Architecture**. Unlike traditional pipelines where data is pushed directly to a database, we treat a specific Kafka topic (`{KAFKA_TOPIC}-normalized`) as the **immutable, canonical source of truth**.
+- **Data Parity**: Since both ClickHouse (OLAP) and Elasticsearch (Search) consume from this same log, they are guaranteed to stay in sync.
+- **Replayability**: New services or analytical engines can be "hydrated" at any time by simply replaying the Truth Log from a specific offset.
+- **Decoupling**: The transformation logic is isolated from storage-specific dialects, allowing the Flink processor to remain lean and scalable.
 
-1.  **Ingestion**: 
-    *   The `datagen` service (Python) generates realistic financial transactions (payments, transfers, withdrawals) using the Faker library.
-    *   Events are serialized to JSON and published to the `fin-transaction` Kafka topic.
+### 2. Hybrid Analytical Strategy
+FinPulse leverages a tiered storage model to balance sub-second latency with deep historical depth:
+- **Elasticsearch (Real-time Hub)**: Optimized for point-lookups, 24-hour KPI windows, and full-text transaction searching. It provides the "Pulse" of the system.
+- **ClickHouse (OLAP Engine)**: A column-oriented powerhouse used for complex time-series aggregations, month-over-month growth trends, and multi-year historical audits.
 
-2.  **Stream Processing**:
-    *   Apache Flink consumes the Kafka stream.
-    *   **Watermark Strategy**: Assigns event-time watermarks (allowing for 5-second out-of-order data) to handle late arrivals correctly.
-    *   **Transformation**: The stream is split into multiple logical flows:
-        *   **Raw Storage**: All events are indexed into `es_transactions` for granular search.
-        *   **High-Value Detection**: Transactions > $5,000 are filtered and sunk to `es_high_value`.
-        *   ** Entity Flows**: Debits and credits are split to track per-user/merchant cash flow in `es_entity_flows`.
-        *   **Temporal Aggregations**: Tumbling windows calculate metrics (Volume, Count, Unique Users) for Daily (`es_daily_stats`) and Monthly (`es_monthly_stats`) rollups.
+#### **Routing Decision Logic**
+The API layer implements an **Intelligent Hybrid Router** that evaluates incoming queries based on temporal range and aggregation complexity:
+| Query Range | Primary Store | Rationale |
+| :--- | :--- | :--- |
+| **Real-time (< 1h)** | Elasticsearch | Sub-millisecond indexed search for the "latest" events. |
+| **Short-term (< 30d)** | Elasticsearch | Leverages pre-computed Flink rollups and BKD-trees for fast filtering. |
+| **Historical (>= 30d)** | ClickHouse | Optimized for heavy columnar scans and year-over-year math. |
+| **Custom Range** | Hybrid | Transparently selects the engine to ensure consistent 300ms response times. |
 
-3.  **Presentation**:
-    *   The Next.js Dashboard polls the API layer.
-    *   API routes construct complex boolean queries to retrieve data from Elasticsearch.
-    *   The UI renders real-time charts (Recharts) and KPI tiles, refreshing every few seconds to reflect the live data stream.
+### 3. Event-Time & Watermarking
+Financial data is often out-of-order. FinPulse uses Flink's **Event-Time** processing instead of ingestion-time:
+- **Watermarks**: 5-second out-of-order allowance ensures that late-arriving transactions are correctly accounted for in their respective time windows.
+- **Deterministic Aggregations**: Guarantees that the same transaction stream will always produce the same result, regardless of network delays or system restarts.
+
+### 4. Operational Excellence (`run.sh`)
+The platform is designed for **Zero-Touch Initialization**. The `run.sh` script automates the entire lifecycle:
+- **Autonomous Setup**: Automatically downloads missing Flink JARs, prepares Kafka topics, and initializes multi-service schemas.
+- **Health-Aware Orchestration**: Uses iterative polling (Wait-For-Ready checks) to ensure that inter-dependent services (like Flink-to-Kafka or ES-to-Infra) boot in the correct logical sequence.
+
+### 5. Flexible Schema Mapping
+The system is built to ingest diverse financial data formats via a decoupled mapping layer:
+- **`source_mapping.json`**: This configuration file allows administrators to map raw Kafka fields to the canonical FinPulse schema without writing a single line of Java/Python.
+- **Normalizer Logic**: The Flink processor dynamically loads this mapping to handle field renames, data type casting, and default value injection (e.g., fallback currencies) on the fly.
 
 
 
@@ -149,6 +173,7 @@ The fastest way to start the entire platform is using the manager script:
 | **Flink UI** | http://localhost:8081 | Flink Job Monitoring |
 | **Kafka** | http://localhost:9092 | Messaging Broker |
 | **Elasticsearch** | http://localhost:9200 | REST API for Search |
+| **ClickHouse** | http://localhost:8123 | OLAP Query API |
 | **Kibana** | http://localhost:5601 | Data Visualization UI |
 
 
@@ -279,9 +304,8 @@ This architecture is designed for high-throughput, low-latency financial workloa
 
 While the current stack is robust, the following improvements would further enhance production readiness:
 
-1.  **Event-Time Windowing**: Migrating from Processing-Time to Event-Time in Flink with Watermarks to handle late-arriving data and ensure deterministic aggregations.
-2.  **Exactly-Once Semantics**: Tuning Flink checkpoints and Elasticsearch transactional sinks to guarantee zero data loss or duplication.
-3.  **Schema Enforcement**: Integrating Confluent Schema Registry to enforce Avro/Protobuf contracts on the data stream.
-4.  **Real-time Push (WebSockets/SSE)**: Replacing the current HTTP polling mechanism with WebSockets to further reduce latency and API overhead.
-5.  **Multi-Tiered Storage**: Automatically archiving aged raw data from Elasticsearch to Apache Iceberg or S3 for long-term compliance auditing at lower cost.
-6.  **AI/ML Anomaly Detection**: Integrating a Flink-ML module or side-calls to a real-time inference endpoint for advanced financial fraud detection.
+1.  **Exactly-Once Semantics**: Tuning Flink checkpoints and Elasticsearch transactional sinks to guarantee zero data loss or duplication.
+2.  **Schema Enforcement**: Integrating Confluent Schema Registry to enforce Avro/Protobuf contracts on the data stream.
+3.  **Real-time Push (WebSockets/SSE)**: Replacing the current HTTP polling mechanism with WebSockets to further reduce latency and API overhead.
+4.  **Multi-Tiered Storage**: Automatically archiving aged raw data from Elasticsearch to Apache Iceberg or S3 for long-term compliance auditing at lower cost.
+5.  **AI/ML Anomaly Detection**: Integrating a Flink-ML module or side-calls to a real-time inference endpoint for advanced financial fraud detection.
