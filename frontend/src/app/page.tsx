@@ -81,15 +81,22 @@ export default function Dashboard() {
         <div className="flex flex-col gap-4">
           <div className="flex flex-col md:flex-row md:items-center gap-4">
             <h1 className="text-4xl font-bold text-foreground tracking-tight">Dashboard</h1>
-            <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/5 border border-primary/10 shadow-sm self-start md:self-center">
-              <span className="relative flex h-2 w-2">
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/5 border border-primary/10 shadow-sm self-start md:self-center">
+              <span className="relative flex h-1.5 w-1.5">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
               </span>
-              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Last Sync:</span>
-              <span className="text-[10px] font-mono font-bold text-primary tabular-nums">
-                {new Date().toLocaleTimeString()}
-              </span>
+              <div className="flex items-center gap-1 text-[10px] font-bold tracking-tight">
+                <span className="text-muted-foreground/60 uppercase">Data:</span>
+                <span className="text-emerald-600 font-mono">
+                  {data?.last_event_ts ? new Date(data.last_event_ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '...'}
+                </span>
+                <span className="mx-1 text-border">|</span>
+                <span className="text-muted-foreground/60 uppercase">Sync:</span>
+                <span className="text-muted-foreground/40 font-mono">
+                  {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                </span>
+              </div>
             </div>
           </div>
           <p className="text-muted-foreground text-md">

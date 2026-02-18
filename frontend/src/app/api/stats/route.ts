@@ -258,6 +258,7 @@ export async function GET(request: Request) {
       total_count: (aggs.hits.total as any).value || 0,
       active_users: aggregations.active_users?.value || 0,
       tps: parseFloat(tps.toFixed(2)),
+      last_event_ts: recentTx.hits.hits[0]?._source?.ts || null,
       category_stats: formattedCatStats,
       alerts: highValueAlerts.hits.hits.map(h => h._source)
     });
