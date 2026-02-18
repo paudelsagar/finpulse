@@ -366,8 +366,9 @@ def generate_transaction():
 def main():
     producer = create_producer()
     print(
-        f"Starting legacy-compatible schema generator (main1.py) to topic '{TOPIC_NAME}'..."
+        f"Starting legacy-compatible schema generator (main.py) to topic '{TOPIC_NAME}'..."
     )
+    print(f"Configuration: BATCH_SIZE={BATCH_SIZE}, SLEEP_TIME={SLEEP_TIME}")
 
     try:
         while True:

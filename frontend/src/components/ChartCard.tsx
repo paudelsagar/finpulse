@@ -4,7 +4,7 @@ import { Maximize, Minimize } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
 interface ChartCardProps {
-  title: string;
+  title: React.ReactNode;
   description?: string;
   children: React.ReactNode;
   actions?: React.ReactNode;

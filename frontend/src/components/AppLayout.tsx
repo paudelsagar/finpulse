@@ -14,7 +14,7 @@ export default function AppLayout({
   const [isMobileOpen, setIsMobileOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-background text-foreground font-sans">
+    <div className="flex h-screen bg-background text-foreground font-sans overflow-hidden">
       {/* Mobile Backdrop Overlay */}
       {isMobileOpen && (
         <div 
@@ -45,7 +45,7 @@ export default function AppLayout({
              </button>
          </header>
          
-         <main className="flex-1 overflow-auto p-4 md:p-8 relative">
+         <main className="flex-1 overflow-auto relative">
             {children}
          </main>
       </div>

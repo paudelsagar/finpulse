@@ -1,6 +1,7 @@
 'use client';
 
 import AccountHubs from '@/components/AccountHubs';
+import { ActivityHeatmap } from '@/components/ActivityHeatmap';
 import AmountDistribution from '@/components/AmountDistribution';
 import ChannelReliability from '@/components/ChannelReliability';
 import CorrectionTracker from '@/components/CorrectionTracker';
@@ -37,7 +38,7 @@ export default function Dashboard() {
   const pathname = usePathname();
   const { replace } = useRouter();
   
-  const [timeRange, setTimeRange] = useState('15m');
+  const [timeRange, setTimeRange] = useState('1h');
   const activeTab = searchParams.get('tab') || 'overview';
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
@@ -80,36 +81,43 @@ export default function Dashboard() {
   })) || [];
 
   const recentTx = data?.recent || [];
+  
+  const activityData = data?.stats?.activity_context?.heatmap?.buckets?.map((b: any) => ({
+      date: b.key_as_string,
+      count: b.doc_count,
+      volume: b.volume?.value || 0
+  })) || [];
 
   return (
-    <div className="max-w-7xl mx-auto space-y-6 pb-12">
+    <div className="max-w-7xl mx-auto space-y-6 pb-12 p-4 md:p-8">
       
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-col md:flex-row md:items-center gap-4">
-            <h1 className="text-4xl font-bold text-foreground tracking-tight">Dashboard</h1>
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/5 border border-primary/10 shadow-sm self-start md:self-center">
-              <span className="relative flex h-1.5 w-1.5">
-                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
-                <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+      <div className="flex flex-col gap-4 mb-2">
+        <div className="flex flex-col md:flex-row md:items-center gap-4">
+          <h1 className="text-4xl font-bold text-foreground tracking-tight">Dashboard</h1>
+          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/5 border border-primary/10 shadow-sm self-start md:self-center">
+            <span className="relative flex h-1.5 w-1.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+            </span>
+            <div className="flex items-center gap-1 text-[10px] font-bold tracking-tight">
+              <span className="text-muted-foreground/60 uppercase">Data:</span>
+              <span className="text-emerald-600 font-mono">
+                {data?.last_event_ts ? new Date(data.last_event_ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '...'}
               </span>
-              <div className="flex items-center gap-1 text-[10px] font-bold tracking-tight">
-                <span className="text-muted-foreground/60 uppercase">Data:</span>
-                <span className="text-emerald-600 font-mono">
-                  {data?.last_event_ts ? new Date(data.last_event_ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) : '...'}
-                </span>
-                <span className="mx-1 text-border">|</span>
-                <span className="text-muted-foreground/60 uppercase">Sync:</span>
-                <span className="text-muted-foreground/40 font-mono">
-                  {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                </span>
-              </div>
+              <span className="mx-1 text-border">|</span>
+              <span className="text-muted-foreground/60 uppercase">Sync:</span>
+              <span className="text-muted-foreground/40 font-mono">
+                {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+              </span>
             </div>
           </div>
-          <p className="text-muted-foreground text-md">
-            Real-time monitoring of global transaction flows and network performance.
-          </p>
-          
+        </div>
+        <p className="text-muted-foreground text-md">
+          Real-time monitoring of global transaction flows and network performance.
+        </p>
+      </div>
+      
+      <div className="sticky top-0 z-30 bg-background -mx-4 px-4 md:-mx-8 md:px-8 py-4 mb-6 flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all">
           <Tabs 
             activeTab={activeTab} 
             onTabChange={(term) => {
@@ -125,7 +133,6 @@ export default function Dashboard() {
               { id: 'executive', label: 'Executive' },
             ]} 
           />
-        </div>
          
          <TimeFilter 
            value={timeRange} 
@@ -270,6 +277,9 @@ export default function Dashboard() {
                 </div>
                 <div className="lg:col-span-2 flex flex-col gap-8">
                     <HighValueAlerts alerts={data?.alerts || []} />
+                </div>
+                <div className="lg:col-span-6">
+                    <ActivityHeatmap data={activityData} timeRange={timeRange} />
                 </div>
                 <div className="lg:col-span-6">
                     <TransactionList transactions={recentTx} />

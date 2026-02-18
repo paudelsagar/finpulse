@@ -10,6 +10,28 @@ const client = new Client({
   node: esUrl
 });
 
+function getHeatmapConfig(range: string) {
+    // Determine Heatmap Grid Strategy
+    // 15m -> 1m buckets (minute-by-minute)
+    // 1h -> 1m buckets (minute-by-minute)
+    // 24h -> 1h buckets (hour-by-hour)
+    // 7d -> 1h buckets (hour-by-hour)
+    // 30d -> 1d buckets (day-by-day)
+    // 365d -> 1d buckets (day-by-day)
+    // all -> 1mo buckets (month-by-month)
+    
+    switch (range) {
+        case '15m': return { interval: '1s', range: 'now-15m', format: 'yyyy-MM-dd HH:mm:ss' };
+        case '1h': return { interval: '1s', range: 'now-1h', format: 'yyyy-MM-dd HH:mm:ss' };
+        case '24h': return { interval: '1m', range: 'now-24h', format: 'yyyy-MM-dd HH:mm' };
+        case '7d': return { interval: '1h', range: 'now-7d/d', format: 'yyyy-MM-dd HH:mm' };
+        case '30d': return { interval: '1h', range: 'now-30d/d', format: 'yyyy-MM-dd HH:mm' };
+        case '365d': return { interval: '1d', range: 'now-365d/d', format: 'yyyy-MM-dd' };
+        case 'all': return { interval: '30d', range: 'now-5y', format: 'yyyy-MM-dd' };
+        default: return { interval: '1h', range: 'now-7d/d', format: 'yyyy-MM-dd HH:mm' };
+    }
+}
+
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const range = searchParams.get('range') || '15m';
@@ -72,6 +94,28 @@ export async function GET(request: Request) {
          }
       },
       aggs: {
+        // Global independent stats (e.g. Heatmap always shows last 60d)
+        // Global independent stats
+        activity_context: {
+           filter: {
+             range: {
+               ts: { gte: getHeatmapConfig(range).range }
+             }
+           },
+           aggs: {
+             heatmap: {
+                date_histogram: {
+                  field: 'ts',
+                  fixed_interval: getHeatmapConfig(range).interval,
+                  format: getHeatmapConfig(range).format
+                },
+                aggs: {
+                  volume: { sum: { field: 'amount' } }
+                }
+             }
+           }
+        },
+
         // Global KPIs (Always needed)
         total_volume: { sum: { field: 'amount' } },
         active_users: { cardinality: { field: 'user_id' } },
