@@ -1,14 +1,24 @@
 {
-  "transaction": {
-    "transactionId": { "source": "transactionId" },
-    "sourceId": { "source": "sourceId" },
-    "sourceName": { "source": "sourceName" },
-    "targetId": { "source": "targetId" },
-    "targetName": { "source": "targetName", "default": "Unknown Target" },
-    "amount": { "source": "amount" },
-    "currency": { "constant": "USD" },
-    "ts_str": { "source": "ts_str" },
-    "type": { "source": "type" },
-    "category": { "source": "category", "default": "Uncategorized" }
-  }
+    "transaction": {
+        "tran_id": "tran_id",
+        "user_id": "user_id",
+        "account_id": "account_id",
+        "counterparty_user_id": "counterparty_user_id",
+        "counterparty_account_id": "counterparty_account_id",
+        "tran_type": "tran_type",
+        "payment_method": "payment_method",
+        "merchant_id": "merchant_id",
+        "merchant_category": "merchant_category",
+        "mcc_code": "mcc_code",
+        "amount": "amount",
+        "balance": "balance",
+        "currency": {"source": "currency", "default": "USD"},
+        "remark": "remark",
+        "channel": "channel",
+        "tran_status": "tran_status",
+        "ref_tran_id": "ref_tran_id",
+        "is_credit": "is_credit",
+        "created_at": "created_at",
+        "tran_date": "tran_date"
+    }
 }

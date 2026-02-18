@@ -3,7 +3,7 @@ import { Client } from '@elastic/elasticsearch';
 import { NextResponse } from 'next/server';
 
 const client = new Client({
-  node: process.env.ELASTICSEARCH_URL || 'http://localhost:9200'
+  node: process.env.ELASTICSEARCH_URL || 'http://127.0.0.1:9200'
 });
 
 export async function GET(request: Request) {
@@ -68,7 +68,7 @@ export async function GET(request: Request) {
       },
       aggs: {
         total_volume: { sum: { field: 'amount' } },
-        active_users: { cardinality: { field: 'sourceId' } },
+        active_users: { cardinality: { field: 'user_id' } },
         tps_window: {
           filter: {
             range: {
@@ -76,16 +76,65 @@ export async function GET(request: Request) {
             }
           }
         },
+        total_liquidity: { sum: { field: 'balance' } },
+        top_accounts: {
+          terms: {
+            field: 'account_id',
+            size: 5,
+            order: { _count: "desc" }
+          }
+        },
+        top_mcc: {
+          terms: {
+            field: 'mcc_code',
+            size: 10,
+            order: { _count: "desc" }
+          }
+        },
+        amount_distribution: {
+          range: {
+            field: 'amount',
+            ranges: [
+              { to: 100, key: "Small (0-100)" },
+              { from: 100, to: 1000, key: "Medium (100-1K)" },
+              { from: 1000, to: 10000, key: "Large (1K-10K)" },
+              { from: 10000, key: "Whale (10K+)" }
+            ]
+          }
+        },
+        by_channel: { 
+          terms: { field: 'channel' },
+          aggs: {
+            statuses: {
+              terms: { field: 'tran_status' }
+            }
+          }
+        },
+        by_payment_method: { 
+          terms: { field: 'payment_method' },
+          aggs: {
+             total_volume: { sum: { field: 'amount' } }
+          }
+        },
+        by_currency: { terms: { field: 'currency' } },
+        by_status: { terms: { field: 'tran_status' } },
         by_type: { 
-          terms: { field: 'type' },
+          terms: { field: 'tran_type' },
           aggs: {
             total_spent: { sum: { field: 'amount' } }
           }
         },
-        by_currency: { terms: { field: 'currency' } },
+        top_recipients: {
+          terms: {
+            field: 'counterparty_user_id',
+            size: 5,
+            order: { _count: "desc" },
+            missing: "Merchant/System"
+          }
+        },
         top_merchants_by_volume: { 
           terms: { 
-            field: 'targetName', 
+            field: 'merchant_id', 
             size: 5,
             order: { total_spent: "desc" }
           },
@@ -95,7 +144,7 @@ export async function GET(request: Request) {
         },
         top_merchants_by_count: { 
           terms: { 
-            field: 'targetName', 
+            field: 'merchant_id', 
             size: 5,
             order: { _count: "desc" }
           },
@@ -119,16 +168,41 @@ export async function GET(request: Request) {
            },
            aggs: {
              volume: { sum: { field: 'amount' } },
-             avg_amount: { avg: { field: 'amount' } }
+             avg_amount: { avg: { field: 'amount' } },
+             flows: {
+               filters: {
+                 filters: {
+                   credits: { term: { is_credit: true } },
+                   debits: { term: { is_credit: false } }
+                 }
+               },
+               aggs: {
+                 volume: { sum: { field: 'amount' } }
+               }
+             },
+             statuses: {
+               filters: {
+                 filters: {
+                   success: { term: { tran_status: 'SUCCESS' } },
+                   failed: { term: { tran_status: 'FAILED' } }
+                 }
+               }
+             }
            }
         },
         by_category: {
-          terms: { field: 'category', size: 20 },
+          terms: { field: 'merchant_category', size: 20 },
           aggs: {
               total_volume: { sum: { field: 'amount' } },
-              tx_count: { value_count: { field: 'transactionId' } },
+              tx_count: { value_count: { field: 'tran_id' } },
               avg_amount: { avg: { field: 'amount' } },
               max_amount: { max: { field: 'amount' } }
+          }
+        },
+        reversal_stats: {
+          filter: { exists: { field: 'reference_tran_id' } },
+          aggs: {
+            total_reversals: { sum: { field: 'amount' } }
           }
         }
       }
@@ -145,13 +219,14 @@ export async function GET(request: Request) {
     })) || [];
 
     // 4. Get High Value Alerts
+    // 4. Get High Value Alerts
     const highValueAlerts = await client.search({
       index: 'es_high_value',
-      sort: [{ 'ts': 'desc' }],
+      sort: [{ 'tran_date': 'desc' }],
       size: 5,
       query: {
          range: {
-             ts: { gte: localStart }
+             tran_date: { gte: localStart }
          }
       }
     });

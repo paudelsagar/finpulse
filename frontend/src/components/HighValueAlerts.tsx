@@ -30,7 +30,7 @@ export default function HighValueAlerts({ alerts }: { alerts: any[] }) {
       <div className="flex-1 w-full min-h-0 relative space-y-4 overflow-y-auto pr-1 custom-scrollbar">
         {alerts.map((alert, i) => (
           <div 
-            key={alert.transactionId} 
+            key={alert.tran_id} 
             className="group relative flex items-center justify-between p-3 rounded-xl bg-orange-500/5 border border-orange-500/20 hover:bg-orange-500/10 transition-all duration-300 overflow-hidden"
           >
             {/* Animated background pulse for the latest alert */}
@@ -50,7 +50,7 @@ export default function HighValueAlerts({ alerts }: { alerts: any[] }) {
                   <span className="px-1.5 py-0.5 rounded-full bg-orange-500/20 text-orange-600 text-[8px] font-black uppercase">Alert</span>
                 </div>
                 <p className="text-[10px] text-muted-foreground mt-0.5 truncate max-w-[120px]">
-                  {alert.sourceName} → {alert.targetName}
+                  User: {alert.user_id}
                 </p>
               </div>
             </div>
@@ -62,7 +62,7 @@ export default function HighValueAlerts({ alerts }: { alerts: any[] }) {
               <div className="flex items-center justify-end gap-1 mt-0.5 text-muted-foreground">
                 <Clock size={10} />
                 <span className="text-[9px] font-bold">
-                  {new Date(alert.ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  {new Date(alert.tran_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                 </span>
               </div>
             </div>

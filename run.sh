@@ -155,16 +155,27 @@ elif [ "$1" == "all" ] || [ "$1" == "start" ]; then
     {
       "mappings": {
         "properties": {
+          "tran_date": { "type": "date", "format": "yyyy-MM-dd HH:mm:ss||strict_date_optional_time||epoch_millis" },
           "ts": { "type": "date", "format": "yyyy-MM-dd HH:mm:ss||strict_date_optional_time||epoch_millis" },
           "amount": { "type": "float" },
-          "category": { "type": "keyword" },
-          "type": { "type": "keyword" },
+          "balance": { "type": "float" },
+          "merchant_category": { "type": "keyword" },
+          "tran_type": { "type": "keyword" },
           "currency": { "type": "keyword" },
-          "sourceId": { "type": "keyword" },
-          "targetId": { "type": "keyword" },
-          "sourceName": { "type": "keyword" },
-          "targetName": { "type": "keyword" },
-          "transactionId": { "type": "keyword" }
+          "user_id": { "type": "keyword" },
+          "account_id": { "type": "keyword" },
+          "counterparty_user_id": { "type": "keyword" },
+          "counterparty_account_id": { "type": "keyword" },
+          "merchant_id": { "type": "keyword" },
+          "payment_method": { "type": "keyword" },
+          "mcc_code": { "type": "keyword" },
+          "channel": { "type": "keyword" },
+          "tran_status": { "type": "keyword" },
+          "ref_tran_id": { "type": "keyword" },
+          "is_credit": { "type": "boolean" },
+          "created_at": { "type": "date", "format": "yyyy-MM-dd HH:mm:ss||strict_date_optional_time||epoch_millis" },
+          "tran_id": { "type": "keyword" },
+          "remark": { "type": "text" }
         }
       }
     }' 2>/dev/null
@@ -174,11 +185,10 @@ elif [ "$1" == "all" ] || [ "$1" == "start" ]; then
     {
       "mappings": {
         "properties": {
-          "ts": { "type": "date", "format": "yyyy-MM-dd HH:mm:ss||strict_date_optional_time||epoch_millis" },
+          "tran_date": { "type": "date", "format": "yyyy-MM-dd HH:mm:ss||strict_date_optional_time||epoch_millis" },
           "amount": { "type": "float" },
-          "sourceName": { "type": "keyword" },
-          "targetName": { "type": "keyword" },
-          "transactionId": { "type": "keyword" }
+          "user_id": { "type": "keyword" },
+          "tran_id": { "type": "keyword" }
         }
       }
     }' 2>/dev/null
@@ -188,12 +198,11 @@ elif [ "$1" == "all" ] || [ "$1" == "start" ]; then
     {
       "mappings": {
         "properties": {
-          "ts": { "type": "date", "format": "yyyy-MM-dd HH:mm:ss||strict_date_optional_time||epoch_millis" },
+          "tran_date": { "type": "date", "format": "yyyy-MM-dd HH:mm:ss||strict_date_optional_time||epoch_millis" },
           "amount": { "type": "float" },
-          "entityId": { "type": "keyword" },
-          "entityName": { "type": "keyword" },
+          "entity_id": { "type": "keyword" },
           "flow_type": { "type": "keyword" },
-          "transactionId": { "type": "keyword" }
+          "tran_id": { "type": "keyword" }
         }
       }
     }' 2>/dev/null

@@ -1,17 +1,29 @@
 'use client';
 
+import AccountHubs from '@/components/AccountHubs';
+import AmountDistribution from '@/components/AmountDistribution';
 import AvgTransactionChart from '@/components/AvgTransactionChart';
 import CategoryChart from '@/components/CategoryChart';
+import ChannelReliability from '@/components/ChannelReliability';
+import CorrectionTracker from '@/components/CorrectionTracker';
+import CreditDebitSplit from '@/components/CreditDebitSplit';
+import CurrencyMix from '@/components/CurrencyMix';
 import HighValueAlerts from '@/components/HighValueAlerts';
 import HourlyHeatmap from '@/components/HourlyHeatmap';
+import LiquidityPulse from '@/components/LiquidityPulse';
+import MCCDistribution from '@/components/MCCDistribution';
+import NetworkConnectivity from '@/components/NetworkConnectivity';
+import PaymentMethodGrid from '@/components/PaymentMethodGrid';
 import PaymentTypeChart from '@/components/PaymentTypeChart';
+import RecipientRanking from '@/components/RecipientRanking';
+import StatusDonut from '@/components/StatusDonut';
 import TimeFilter from '@/components/TimeFilter';
 import TopEntitiesChart from "@/components/TopEntitiesChart";
 import TransactionList from '@/components/TransactionList';
 import VolumeChart from '@/components/VolumeChart';
 import { POLLING_INTERVAL } from '@/lib/constants';
 import { formatRichCurrency, formatRichNumber } from '@/lib/utils';
-import { Activity, CreditCard, TrendingUp, Users, Zap } from 'lucide-react';
+import { Activity, CreditCard, TrendingUp, Zap } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
 export default function Dashboard() {
@@ -56,7 +68,8 @@ export default function Dashboard() {
       key_as_string: b.key_as_string,
       value: b.volume.value,
       count: b.doc_count,
-      avg: b.avg_amount.value
+      avg: b.avg_amount.value,
+      failed_count: b.statuses?.buckets?.failed?.doc_count || 0
   })) || [];
 
   const recentTx = data?.recent || [];
@@ -96,133 +109,153 @@ export default function Dashboard() {
 
       {/* KPI Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <div className="bg-card border border-border p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center border bg-blue-500/10 text-blue-500 border-blue-500/20 shadow-sm shrink-0">
-              <CreditCard size={24} />
+        <div className="bg-card border border-border p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+          <div className="absolute -right-2 -top-2 w-20 h-20 bg-blue-500/5 rounded-full flex items-center justify-center border border-blue-500/10 group-hover:bg-blue-500/10 transition-colors">
+            <CreditCard size={32} className="text-blue-500/30" />
+          </div>
+          <div className="relative z-10">
+            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Total Volume</p>
+            <div className="mt-2 flex flex-wrap items-baseline gap-x-1.5 font-mono tracking-tight tabular-nums">
+              {formatRichCurrency(totalVol, 'USD', 0).map((part, i) => {
+                const sizeClass = [
+                  "text-3xl font-bold text-foreground",
+                  "text-base font-semibold text-muted-foreground",
+                  "text-xs font-medium text-muted-foreground/60",
+                  "text-[10px] font-medium text-muted-foreground/40"
+                ][Math.min(i, 3)];
+                return (
+                  <span key={i} className={sizeClass}>
+                    {part.value}<span className="text-[10px] ml-0.5 opacity-70 font-bold uppercase">{part.unit}</span>
+                  </span>
+                );
+              })}
             </div>
-            <div>
-              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Total Volume</p>
-              <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5 font-mono tracking-tight tabular-nums">
-                {formatRichCurrency(totalVol, 'USD', 0).map((part, i) => {
-                  const sizeClass = [
-                    "text-3xl font-bold text-foreground",
-                    "text-base font-semibold text-muted-foreground",
-                    "text-xs font-medium text-muted-foreground/60",
-                    "text-[10px] font-medium text-muted-foreground/40"
-                  ][Math.min(i, 3)];
-                  return (
-                    <span key={i} className={sizeClass}>
-                      {part.value}<span className="text-[10px] ml-0.5 opacity-70 font-bold uppercase">{part.unit}</span>
-                    </span>
-                  );
-                })}
-              </div>
-              <div className="flex items-center gap-1 mt-1 text-green-500 text-[10px] font-bold uppercase">
-                <TrendingUp size={12} />
-                <span>+12.5% vs last hour</span>
-              </div>
+            <div className="flex items-center gap-1 mt-2 text-green-500 text-[10px] font-bold uppercase">
+              <TrendingUp size={12} />
+              <span>+12.5% VS LH</span>
             </div>
           </div>
         </div>
 
-        <div className="bg-card border border-border p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center border bg-indigo-500/10 text-indigo-500 border-indigo-500/20 shadow-sm shrink-0">
-              <Zap size={24} />
+        <div className="bg-card border border-border p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+          <div className="absolute -right-2 -top-2 w-20 h-20 bg-indigo-500/5 rounded-full flex items-center justify-center border border-indigo-500/10 group-hover:bg-indigo-500/10 transition-colors">
+            <Zap size={32} className="text-indigo-500/30" />
+          </div>
+          <div className="relative z-10">
+            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Total Interactions</p>
+            <div className="mt-2 flex flex-wrap items-baseline gap-x-1.5 font-mono tracking-tight tabular-nums">
+              {formatRichNumber(data?.total_count || 0).map((part, i) => {
+                const sizeClass = [
+                  "text-3xl font-bold text-foreground",
+                  "text-base font-semibold text-muted-foreground",
+                  "text-xs font-medium text-muted-foreground/60",
+                  "text-[10px] font-medium text-muted-foreground/40"
+                ][Math.min(i, 3)];
+                return (
+                  <span key={i} className={sizeClass}>
+                    {part.value}<span className="text-[10px] ml-0.5 opacity-70 font-bold uppercase">{part.unit}</span>
+                  </span>
+                );
+              })}
             </div>
-            <div>
-              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Total Interactions</p>
-              <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5 font-mono tracking-tight tabular-nums">
-                {formatRichNumber(data?.total_count || 0).map((part, i) => {
-                  const sizeClass = [
-                    "text-3xl font-bold text-foreground",
-                    "text-base font-semibold text-muted-foreground",
-                    "text-xs font-medium text-muted-foreground/60",
-                    "text-[10px] font-medium text-muted-foreground/40"
-                  ][Math.min(i, 3)];
-                  return (
-                    <span key={i} className={sizeClass}>
-                      {part.value}<span className="text-[10px] ml-0.5 opacity-70 font-bold uppercase">{part.unit}</span>
-                    </span>
-                  );
-                })}
-              </div>
-              <div className="flex items-center gap-1 mt-1 text-blue-500 text-[10px] font-bold uppercase">
-                <Activity size={12} />
-                <span>Live Feed</span>
-              </div>
+            <div className="flex items-center gap-1 mt-2 text-blue-500 text-[10px] font-bold uppercase">
+              <Activity size={12} />
+              <span>Live Feed</span>
             </div>
           </div>
         </div>
         
-        <div className="bg-card border border-border p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center border bg-purple-500/10 text-purple-500 border-purple-500/20 shadow-sm shrink-0">
-              <Users size={24} />
-            </div>
-            <div>
-              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Active Users</p>
-              <div className="mt-1 flex flex-wrap items-baseline gap-x-1.5 font-mono tracking-tight tabular-nums">
-                {formatRichNumber(data?.active_users || 0).map((part, i) => {
-                  const sizeClass = [
-                    "text-3xl font-bold text-foreground",
-                    "text-base font-semibold text-muted-foreground",
-                    "text-xs font-medium text-muted-foreground/60",
-                    "text-[10px] font-medium text-muted-foreground/40"
-                  ][Math.min(i, 3)];
-                  return (
-                    <span key={i} className={sizeClass}>
-                      {part.value}<span className="text-[10px] ml-0.5 opacity-70 font-bold uppercase">{part.unit}</span>
-                    </span>
-                  );
-                })}
-              </div>
-              <div className="flex items-center gap-1 mt-1 text-green-500 text-[10px] font-bold uppercase">
-                <TrendingUp size={12} />
-                <span>Real-time Insight</span>
-              </div>
-            </div>
-          </div>
+        <div className="bg-card border border-border rounded-xl shadow-sm hover:shadow-md transition-shadow">
+          <LiquidityPulse total={data?.stats?.total_liquidity?.value || 0} />
         </div>
 
-        <div className="bg-card border border-border p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl flex items-center justify-center border bg-orange-500/10 text-orange-500 border-orange-500/20 shadow-sm shrink-0">
-              <Activity size={24} />
+        <div className="bg-card border border-border p-6 rounded-xl shadow-sm hover:shadow-md transition-shadow relative overflow-hidden group">
+          <div className="absolute -right-2 -top-2 w-20 h-20 bg-orange-500/5 rounded-full flex items-center justify-center border border-orange-500/10 group-hover:bg-orange-500/10 transition-colors">
+            <Activity size={32} className="text-orange-500/30" />
+          </div>
+          <div className="relative z-10">
+            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Processing Rate</p>
+            <div className="mt-2 flex flex-wrap items-baseline gap-x-1.5 font-mono tracking-tight tabular-nums">
+              {formatRichNumber(data?.tps || 0).map((part, i) => {
+                const sizeClass = [
+                  "text-3xl font-bold text-foreground",
+                  "text-base font-semibold text-muted-foreground",
+                  "text-xs font-medium text-muted-foreground/60",
+                  "text-[10px] font-medium text-muted-foreground/40"
+                ][Math.min(i, 3)];
+                return (
+                  <span key={i} className={sizeClass}>
+                    {part.value}<span className="text-[10px] ml-0.5 opacity-70 font-bold uppercase">{part.unit}</span>
+                  </span>
+                );
+              })}
+              <span className="text-[10px] font-black text-muted-foreground/40 uppercase mb-0.5 ml-1 leading-none">TPS</span>
             </div>
-            <div>
-              <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Processing Rate</p>
-              <div className="mt-1 flex items-baseline font-mono tracking-tight tabular-nums text-foreground">
-                <span className="text-lg font-medium opacity-50 mr-0.5">~</span>
-                <h3 className="text-3xl font-bold">
-                  {data?.tps || 0}
-                </h3>
-                <span className="ml-1.5 text-xs font-black text-muted-foreground uppercase opacity-70">TPS</span>
-              </div>
-              <div className="flex items-center gap-1 mt-1 text-blue-500 text-[10px] font-bold uppercase">
-                <Zap size={12} />
-                <span>Live Throughput</span>
-              </div>
+            <div className="flex items-center gap-1 mt-2 text-blue-500 text-[10px] font-bold uppercase">
+              <Zap size={12} />
+              <span>Live Throughput</span>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Main Content Grid: Row 1 */}
+      {/* Row 1: High Level Trends */}
       <div className="grid grid-cols-1 lg:grid-cols-6 gap-8">
-        <div className="lg:col-span-4 space-y-8">
+        <div className="lg:col-span-4 flex flex-col gap-8">
            <VolumeChart data={volHistory} />
+           <CreditDebitSplit data={data?.stats?.volume_over_time?.buckets || []} />
         </div>
-        <div className="lg:col-span-2 space-y-8">
+        <div className="lg:col-span-2 flex flex-col gap-8">
+            <StatusDonut data={data?.stats?.by_status?.buckets || []} />
+            <CurrencyMix data={data?.stats?.by_currency?.buckets || []} />
             <HighValueAlerts alerts={data?.alerts || []} />
         </div>
       </div>
 
-      {/* Row 2: Category Stats, Merchants and Alerts */}
+      {/* Row 2: Behavioral & Health Analysis */}
       <div className="grid grid-cols-1 lg:grid-cols-6 gap-8">
         <div className="lg:col-span-2">
+           <ChannelReliability data={data?.stats?.by_channel?.buckets || []} />
+        </div>
+        <div className="lg:col-span-2">
+           <PaymentMethodGrid data={data?.stats?.by_payment_method?.buckets || []} />
+        </div>
+        <div className="lg:col-span-2">
+           <AmountDistribution data={data?.stats?.amount_distribution?.buckets || []} />
+        </div>
+      </div>
+
+      {/* Row 3: Entity Hubs & Connectivity */}
+      <div className="grid grid-cols-1 lg:grid-cols-6 gap-8">
+        <div className="lg:col-span-2">
+           <AccountHubs data={data?.stats?.top_accounts?.buckets || []} />
+        </div>
+        <div className="lg:col-span-2">
+           <RecipientRanking data={data?.stats?.top_recipients?.buckets || []} />
+        </div>
+        <div className="lg:col-span-2">
+            <NetworkConnectivity data={data?.stats?.by_type?.buckets || []} />
+        </div>
+      </div>
+
+      {/* Row 4: Specialized Metrics & High Frequency Distribution */}
+      <div className="grid grid-cols-1 lg:grid-cols-6 gap-8">
+        <div className="lg:col-span-2">
+           <MCCDistribution data={data?.stats?.top_mcc?.buckets || []} />
+        </div>
+        <div className="lg:col-span-2">
            <CategoryChart data={data?.category_stats || []} />
+        </div>
+        <div className="lg:col-span-2">
+           <CorrectionTracker data={data?.stats?.reversal_stats || { doc_count: 0, total_reverals: { value: 0 } }} />
+        </div>
+      </div>
+
+      {/* Row 5: Deep Performance & Entity Hubs */}
+      <div className="grid grid-cols-1 lg:grid-cols-6 gap-8">
+        <div className="lg:col-span-2 flex flex-col gap-8">
+           <AvgTransactionChart data={volHistory} />
+           <PaymentTypeChart data={data?.stats?.by_type?.buckets || []} />
         </div>
         <div className="lg:col-span-2">
            <TopEntitiesChart 
@@ -231,21 +264,11 @@ export default function Dashboard() {
            />
         </div>
         <div className="lg:col-span-2">
-           <PaymentTypeChart data={data?.stats?.by_type?.buckets || []} />
+           <HourlyHeatmap data={data?.stats?.hourly_activity?.buckets || []} />
         </div>
       </div>
 
-      {/* Row 3: Avg Trends and Heatmap */}
-      <div className="grid grid-cols-1 lg:grid-cols-6 gap-8">
-         <div className="lg:col-span-4">
-            <AvgTransactionChart data={volHistory} />
-         </div>
-         <div className="lg:col-span-2">
-            <HourlyHeatmap data={data?.stats?.hourly_activity?.buckets || []} />
-         </div>
-      </div>
-
-      {/* Row 4: Transaction List */}
+      {/* Row 6: Transaction Ledger */}
       <div className="grid grid-cols-1 gap-8">
            <TransactionList transactions={recentTx} />
       </div>

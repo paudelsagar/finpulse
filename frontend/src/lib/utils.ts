@@ -35,6 +35,16 @@ export const formatCompactNumber = (num: number) => {
   }).format(num);
 }
 
+export const formatCompactCurrency = (amount: number, currency = 'USD') => {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: currency,
+    notation: "compact",
+    compactDisplay: "short",
+    maximumFractionDigits: 1,
+  }).format(amount);
+};
+
 export const formatSplitCurrency = (num: number, currency = 'USD') => {
   const formatted = new Intl.NumberFormat('en-US', {
     style: 'decimal',

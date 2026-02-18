@@ -182,6 +182,8 @@ The fastest way to start the entire platform is using the manager script:
 
 ### Next
 
+
+
 | Field                   | Data Type | Description                                                  |
 | ----------------------- | --------- | ------------------------------------------------------------ |
 | tran_id                 | string    | Unique transaction identifier                                |

@@ -89,11 +89,6 @@ class FlinkProcessor:
 
         Attempts to read 'source_mapping.json'. If the file is not found,
         it falls back to a default identity mapping.
-
-        Notes
-        -----
-        The JSON structure is expected to have a "transaction" key containing
-        the mapping definitions.
         """
         # Load field mapping configuration
         try:
@@ -108,17 +103,28 @@ class FlinkProcessor:
             print(
                 f"Warning: source_mapping.json not found at {config_path}. Using default identity mapping."
             )
+            # Default to new schema fields identity mapping
             self.field_mapping = {
-                "transactionId": "transactionId",
-                "sourceId": "sourceId",
-                "sourceName": "sourceName",
-                "targetId": "targetId",
-                "targetName": "targetName",
+                "tran_id": "tran_id",
+                "user_id": "user_id",
+                "account_id": "account_id",
+                "counterparty_user_id": "counterparty_user_id",
+                "counterparty_account_id": "counterparty_account_id",
+                "tran_type": "tran_type",
+                "payment_method": "payment_method",
+                "merchant_id": "merchant_id",
+                "merchant_category": "merchant_category",
+                "mcc_code": "mcc_code",
+                "is_credit": "is_credit",
                 "amount": "amount",
+                "balance": "balance",
                 "currency": "currency",
-                "ts_str": "ts_str",
-                "type": "type",
-                "category": "category",
+                "remark": "remark",
+                "channel": "channel",
+                "tran_status": "tran_status",
+                "ref_tran_id": "ref_tran_id",
+                "created_at": "created_at",
+                "tran_date": "tran_date",
             }
 
     def _define_source(self):
@@ -128,23 +134,32 @@ class FlinkProcessor:
         Creates a table named 'transactions' that consumes JSON data from
         the configured Kafka topic.
         """
-        # 3. Define Source Table (Kafka) - RAW Schema from main.py
-        # Must match the fields produced by main.py
+        # 3. Define Source Table (Kafka) - MATCHING main_future.py Schema
         self.t_env.execute_sql(
             """
             CREATE TABLE transactions (
-                transactionId STRING,
-                sourceId STRING,
-                sourceName STRING,
-                targetId STRING,
-                targetName STRING,
+                tran_id STRING,
+                tran_date STRING,
+                user_id STRING,
+                account_id STRING,
+                counterparty_user_id STRING,
+                counterparty_account_id STRING,
+                tran_type STRING,
+                payment_method STRING,
+                merchant_id STRING,
+                merchant_category STRING,
+                mcc_code STRING,
+                is_credit BOOLEAN,
                 amount DECIMAL(12, 2),
+                balance DECIMAL(12, 2),
                 currency STRING,
-                ts_str STRING,
-                type STRING,
-                category STRING,
-                ts AS TO_TIMESTAMP(ts_str, 'yyyy-MM-dd HH:mm:ss'), -- Convert to TIMESTAMP
-                WATERMARK FOR ts AS ts - INTERVAL '5' SECOND -- Handle out-of-order events
+                remark STRING,
+                channel STRING,
+                tran_status STRING,
+                ref_tran_id STRING,
+                created_at STRING,
+                ts AS TO_TIMESTAMP(tran_date, 'yyyy-MM-dd HH:mm:ss'),
+                WATERMARK FOR ts AS ts - INTERVAL '5' SECOND
             ) WITH (
                 'connector' = 'kafka',
                 'topic' = '{kafka_topic}',
@@ -164,28 +179,20 @@ class FlinkProcessor:
         """
         Create a temporary view for normalized transactions.
 
-        Dynamically builds a SQL SELECT query based on the loaded field mapping
-        to transform raw data into a canonical format. Handles source aliasing,
-        default values, and constants.
+        Dynamically builds a SQL SELECT query based on the loaded field mapping.
         """
         # 3.1 Create Canonical View (Normalization Logic)
-        # Dynamically build SELECT clause based on JSON mapping
         select_clauses = []
 
         for canonical_field, mapping in self.field_mapping.items():
             if isinstance(mapping, str):
-                # Compatibility for simple string mapping
                 select_clauses.append(f"{mapping} AS {canonical_field}")
             elif isinstance(mapping, dict):
                 if "constant" in mapping:
-                    # Handle Constant: {"constant": "USD"}
                     val = mapping["constant"]
                     select_clauses.append(f"'{val}' AS {canonical_field}")
                 else:
-                    # Handle Source Mapping: {"source": "field", "default": "val"}
-                    # Default to canonical_field if 'source' is missing but it's a dict
                     source = mapping.get("source", canonical_field)
-
                     if "default" in mapping:
                         default_val = mapping["default"]
                         select_clauses.append(
@@ -211,24 +218,32 @@ class FlinkProcessor:
     def _define_sinks(self):
         """
         Define Elasticsearch sink tables.
-
-        Creates tables for raw transactions, high-value alerts, entity flows,
-        daily statistics, and monthly statistics.
         """
-        # 4. Define Sink Table (Elasticsearch) - Raw Transactions
+        # 4. Define Sink Table (Elasticsearch) - Extended Transactions
         self.t_env.execute_sql(
             """
             CREATE TABLE es_transactions (
-                transactionId STRING,
-                sourceId STRING,
-                sourceName STRING,
-                targetId STRING,
-                targetName STRING,
-                amount DECIMAL(10, 2),
+                tran_id STRING,
+                tran_date STRING,
+                user_id STRING,
+                account_id STRING,
+                counterparty_user_id STRING,
+                counterparty_account_id STRING,
+                merchant_id STRING,
+                merchant_category STRING,
+                mcc_code STRING,
+                tran_type STRING,
+                payment_method STRING,
+                amount DECIMAL(12, 2),
+                balance DECIMAL(12, 2),
                 currency STRING,
-                ts STRING,
-                `type` STRING,
-                category STRING
+                remark STRING,
+                channel STRING,
+                tran_status STRING,
+                ref_tran_id STRING,
+                is_credit BOOLEAN,
+                created_at STRING,
+                ts TIMESTAMP(3)
             ) WITH (
                 'connector' = 'elasticsearch-7',
                 'hosts' = '{es_hosts}',
@@ -240,14 +255,14 @@ class FlinkProcessor:
         )
 
         # 5. Define Sink Table (Elasticsearch) - Aggregated High Value Alerts
+        # Adapted for new schema: using user_id instead of names
         self.t_env.execute_sql(
             """
             CREATE TABLE es_high_value (
-                transactionId STRING,
-                sourceName STRING,
-                targetName STRING,
-                amount DECIMAL(10, 2),
-                ts STRING
+                tran_id STRING,
+                user_id STRING,
+                amount DECIMAL(12, 2),
+                tran_date STRING
             ) WITH (
                 'connector' = 'elasticsearch-7',
                 'hosts' = '{es_hosts}',
@@ -258,16 +273,16 @@ class FlinkProcessor:
             )
         )
 
-        # 6. Define Sink Table (Elasticsearch) - Entity Flows (Debits/Credits)
+        # 6. Define Sink Table (Elasticsearch) - Entity Flows
+        # Constructing flows from Payer -> Payee
         self.t_env.execute_sql(
             """
             CREATE TABLE es_entity_flows (
-                entityId STRING,
-                entityName STRING,
-                amount DECIMAL(10, 2),
+                entity_id STRING,
+                amount DECIMAL(12, 2),
                 flow_type STRING, -- 'DEBIT' or 'CREDIT'
-                ts STRING,
-                transactionId STRING
+                tran_date STRING,
+                tran_id STRING
             ) WITH (
                 'connector' = 'elasticsearch-7',
                 'hosts' = '{es_hosts}',
@@ -319,14 +334,6 @@ class FlinkProcessor:
     def _define_pipelines(self):
         """
         Define the data processing pipelines.
-
-        Creates a statement set containing INSERT SQL statements that populate
-        the sink tables from the canonical view.
-
-        Returns
-        -------
-        StatementSet
-            The Flink statement set containing the pipeline definitions.
         """
         statement_set = self.t_env.create_statement_set()
 
@@ -335,16 +342,27 @@ class FlinkProcessor:
             """
             INSERT INTO es_transactions
             SELECT 
-                transactionId, 
-                sourceId, 
-                sourceName, 
-                targetId, 
-                targetName, 
-                amount, 
-                currency, 
-                ts_str, 
-                `type`, 
-                category
+                tran_id,
+                tran_date,
+                user_id,
+                account_id,
+                counterparty_user_id,
+                counterparty_account_id,
+                merchant_id,
+                merchant_category,
+                mcc_code,
+                tran_type,
+                payment_method,
+                amount,
+                balance,
+                currency,
+                remark,
+                channel,
+                tran_status,
+                ref_tran_id,
+                is_credit,
+                created_at,
+                ts
             FROM canonical_transactions
         """
         )
@@ -353,24 +371,37 @@ class FlinkProcessor:
             """
             INSERT INTO es_high_value
             SELECT 
-                transactionId, 
-                sourceName, 
-                targetName, 
-                amount, 
-                ts_str
+                tran_id,
+                user_id,
+                amount,
+                tran_date
             FROM canonical_transactions
-            WHERE amount > 5000
+            WHERE amount > 10000
         """
         )
 
+        # Flow Logic:
+        # Debit the user_id
+        # Credit the counterparty (Merchant or User)
         statement_set.add_insert_sql(
             """
             INSERT INTO es_entity_flows
-            SELECT sourceId, sourceName, -amount, 'DEBIT', ts_str, transactionId
+            SELECT 
+                user_id as entity_id, 
+                -amount, 
+                'DEBIT', 
+                tran_date, 
+                tran_id
             FROM canonical_transactions
             UNION ALL
-            SELECT targetId, targetName, amount, 'CREDIT', ts_str, transactionId
+            SELECT 
+                COALESCE(merchant_id, counterparty_user_id) as entity_id, 
+                amount, 
+                'CREDIT', 
+                tran_date, 
+                tran_id
             FROM canonical_transactions
+            WHERE COALESCE(merchant_id, counterparty_user_id) IS NOT NULL
         """
         )
 
@@ -382,7 +413,7 @@ class FlinkProcessor:
                 SUM(amount) as total_volume,
                 COUNT(*) as tx_count,
                 AVG(amount) as avg_amount,
-                COUNT(DISTINCT sourceId) as unique_users
+                COUNT(DISTINCT user_id) as unique_users
             FROM canonical_transactions
             GROUP BY TUMBLE(ts, INTERVAL '1' DAY)
         """
@@ -396,7 +427,7 @@ class FlinkProcessor:
                 SUM(amount) as total_volume,
                 COUNT(*) as tx_count,
                 AVG(amount) as avg_amount,
-                COUNT(DISTINCT sourceId) as unique_users
+                COUNT(DISTINCT user_id) as unique_users
             FROM canonical_transactions
             GROUP BY TUMBLE(ts, INTERVAL '30' DAY)
         """
@@ -407,9 +438,6 @@ class FlinkProcessor:
     def run(self):
         """
         Execute the Flink job.
-
-        Orchestrates the setup of the environment, sources, sinks, and pipelines,
-        and then submits the job for execution.
         """
         self._setup_environment()
         self._load_mapping_config()
@@ -418,7 +446,7 @@ class FlinkProcessor:
         self._define_sinks()
         pipeline = self._define_pipelines()
 
-        print("Submitting Flink Job...")
+        print("Submitting Flink Job (Extended Schema)...")
         pipeline.execute()
 
 

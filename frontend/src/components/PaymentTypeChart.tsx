@@ -2,7 +2,7 @@ import { formatCurrency, formatNumber } from '@/lib/utils';
 import { useState } from 'react';
 import { Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 
-const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'];
+const COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'];
 
 const CustomTooltip = ({ active, payload, mode }: any) => {
   if (active && payload && payload.length) {
@@ -33,8 +33,19 @@ const CustomTooltip = ({ active, payload, mode }: any) => {
 export default function PaymentTypeChart({ data }: { data: any[] }) {
   const [mode, setMode] = useState<'volume' | 'count'>('count');
 
+  const getLabel = (key: string) => {
+    switch(key) {
+      case 'P2P': return 'Peer-to-Peer';
+      case 'P2M': return 'Merchant Payment';
+      case 'M2P': return 'Refund/Payout';
+      case 'B2B': return 'Business-to-Business';
+      case 'SELF': return 'Self Transfer';
+      default: return key;
+    }
+  };
+
   const chartData = data.map(bucket => ({
-    name: bucket.key === 'P2P' ? 'Peer-to-Peer' : 'Merchant Payment',
+    name: getLabel(bucket.key),
     volume: bucket.total_spent.value,
     count: bucket.doc_count,
     value: mode === 'volume' ? bucket.total_spent.value : bucket.doc_count

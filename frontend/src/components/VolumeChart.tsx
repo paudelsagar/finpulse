@@ -1,4 +1,4 @@
-import { formatCurrency } from '@/lib/utils';
+import { formatCompactCurrency, formatCompactNumber, formatCurrency } from '@/lib/utils';
 import { Area, AreaChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import ChartCard from './ChartCard';
 
@@ -65,7 +65,7 @@ export default function VolumeChart({ data }: { data: any[] }) {
             fontSize={10}
             tickLine={false}
             axisLine={false}
-            tickFormatter={(value) => formatCurrency(value, 'USD', 0)}
+            tickFormatter={(value) => formatCompactCurrency(value, 'USD')}
           />
           <YAxis 
             yAxisId="right"
@@ -74,7 +74,7 @@ export default function VolumeChart({ data }: { data: any[] }) {
             fontSize={10}
             tickLine={false}
             axisLine={false}
-            tickFormatter={(value) => value.toLocaleString()}
+            tickFormatter={(value) => formatCompactNumber(value)}
             width={45}
           />
           <Tooltip content={<CustomTooltip />} cursor={{ stroke: 'var(--border)', strokeWidth: 1 }} />
@@ -114,6 +114,16 @@ export default function VolumeChart({ data }: { data: any[] }) {
             fill="transparent"
             strokeDasharray="5 5"
             animationDuration={1500}
+          />
+          <Area 
+            yAxisId="right"
+            name="Failures"
+            type="monotone" 
+            dataKey="failed_count" 
+            stroke="#ef4444" 
+            strokeWidth={2}
+            fill="transparent"
+            animationDuration={2000}
           />
         </AreaChart>
       </ResponsiveContainer>

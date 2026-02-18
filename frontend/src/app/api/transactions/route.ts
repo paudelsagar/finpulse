@@ -43,10 +43,10 @@ export async function GET(request: Request) {
       must.push({
         bool: {
           should: [
-            { match_phrase_prefix: { "transactionId": search } },
-            { match_phrase_prefix: { "sourceName": search } },
-            { match_phrase_prefix: { "targetName": search } },
-            { match_phrase_prefix: { "category": search } }
+            { match_phrase_prefix: { "tran_id": search } },
+            { match_phrase_prefix: { "user_id": search } },
+            { match_phrase_prefix: { "merchant_id": search } },
+            { match_phrase_prefix: { "merchant_category": search } }
           ],
           minimum_should_match: 1
         }
@@ -54,10 +54,10 @@ export async function GET(request: Request) {
     }
 
     if (type) {
-      filter.push({ term: { "type": type } });
+      filter.push({ term: { "tran_type": type } });
     }
     if (category) {
-      filter.push({ term: { "category": category } });
+      filter.push({ term: { "merchant_category": category } });
     }
 
     if (localRangeStart) {
@@ -87,9 +87,9 @@ export async function GET(request: Request) {
       ],
       aggs: {
         total_volume: { sum: { field: 'amount' } },
-        by_type: { terms: { field: 'type' } },
-        available_categories: { terms: { field: 'category', size: 20 } },
-        available_types: { terms: { field: 'type' } }
+        by_type: { terms: { field: 'tran_type' } },
+        available_categories: { terms: { field: 'merchant_category', size: 20 } },
+        available_types: { terms: { field: 'tran_type' } }
       }
     });
 
