@@ -60,7 +60,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData(false); // Initial fetch or params change
-    const interval = setInterval(() => fetchData(true), POLLING_INTERVAL); 
+    const interval = setInterval(() => { fetchData(true); }, POLLING_INTERVAL.FAST); 
     return () => clearInterval(interval);
   }, [timeRange, startDate, endDate, activeTab]); // Re-fetch when timeRange, startDate, endDate or activeTab changes
 

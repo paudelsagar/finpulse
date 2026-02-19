@@ -12,6 +12,10 @@ export async function GET(request: Request) {
   const limit = parseInt(searchParams.get('limit') || '20');
   const search = searchParams.get('search') || '';
   const type = searchParams.get('type') || '';
+  const status = searchParams.get('status') || '';
+  const flow = searchParams.get('flow') || '';
+  const channel = searchParams.get('channel') || '';
+  const method = searchParams.get('method') || '';
   const category = searchParams.get('category') || '';
   const range = searchParams.get('range') || '';
   const startDate = searchParams.get('startDate') || '';
@@ -46,7 +50,8 @@ export async function GET(request: Request) {
             { match_phrase_prefix: { "tran_id": search } },
             { match_phrase_prefix: { "user_id": search } },
             { match_phrase_prefix: { "merchant_id": search } },
-            { match_phrase_prefix: { "merchant_category": search } }
+            { match_phrase_prefix: { "merchant_category": search } },
+            { match_phrase_prefix: { "remark": search } }
           ],
           minimum_should_match: 1
         }
@@ -55,6 +60,18 @@ export async function GET(request: Request) {
 
     if (type) {
       filter.push({ term: { "tran_type": type } });
+    }
+    if (status) {
+      filter.push({ term: { "tran_status": status } });
+    }
+    if (flow) {
+      filter.push({ term: { "is_credit": flow === 'credit' } });
+    }
+    if (channel) {
+      filter.push({ term: { "channel": channel } });
+    }
+    if (method) {
+      filter.push({ term: { "payment_method": method } });
     }
     if (category) {
       filter.push({ term: { "merchant_category": category } });

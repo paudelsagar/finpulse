@@ -97,18 +97,25 @@ graph TB
 
 
 
-### 1. The "Truth Log" Pattern
+### The "Truth Log" Pattern
+
 At the core of FinPulse is a **Log-Centric Architecture**. Unlike traditional pipelines where data is pushed directly to a database, we treat a specific Kafka topic (`{KAFKA_TOPIC}-normalized`) as the **immutable, canonical source of truth**.
 - **Data Parity**: Since both ClickHouse (OLAP) and Elasticsearch (Search) consume from this same log, they are guaranteed to stay in sync.
 - **Replayability**: New services or analytical engines can be "hydrated" at any time by simply replaying the Truth Log from a specific offset.
 - **Decoupling**: The transformation logic is isolated from storage-specific dialects, allowing the Flink processor to remain lean and scalable.
 
-### 2. Hybrid Analytical Strategy
+
+
+### Hybrid Analytical Strategy
+
 FinPulse leverages a tiered storage model to balance sub-second latency with deep historical depth:
 - **Elasticsearch (Real-time Hub)**: Optimized for point-lookups, 24-hour KPI windows, and full-text transaction searching. It provides the "Pulse" of the system.
 - **ClickHouse (OLAP Engine)**: A column-oriented powerhouse used for complex time-series aggregations, month-over-month growth trends, and multi-year historical audits.
 
-#### **Routing Decision Logic**
+
+
+#### Routing Decision Logic
+
 The API layer implements an **Intelligent Hybrid Router** that evaluates incoming queries based on temporal range and aggregation complexity:
 | Query Range | Primary Store | Rationale |
 | :--- | :--- | :--- |
@@ -117,17 +124,26 @@ The API layer implements an **Intelligent Hybrid Router** that evaluates incomin
 | **Historical (>= 30d)** | ClickHouse | Optimized for heavy columnar scans and year-over-year math. |
 | **Custom Range** | Hybrid | Transparently selects the engine to ensure consistent 300ms response times. |
 
-### 3. Event-Time & Watermarking
+
+
+### Event-Time & Watermarking
+
 Financial data is often out-of-order. FinPulse uses Flink's **Event-Time** processing instead of ingestion-time:
 - **Watermarks**: 5-second out-of-order allowance ensures that late-arriving transactions are correctly accounted for in their respective time windows.
 - **Deterministic Aggregations**: Guarantees that the same transaction stream will always produce the same result, regardless of network delays or system restarts.
 
-### 4. Operational Excellence (`run.sh`)
+
+
+### Operational Excellence (`run.sh`)
+
 The platform is designed for **Zero-Touch Initialization**. The `run.sh` script automates the entire lifecycle:
 - **Autonomous Setup**: Automatically downloads missing Flink JARs, prepares Kafka topics, and initializes multi-service schemas.
 - **Health-Aware Orchestration**: Uses iterative polling (Wait-For-Ready checks) to ensure that inter-dependent services (like Flink-to-Kafka or ES-to-Infra) boot in the correct logical sequence.
 
-### 5. Flexible Schema Mapping
+
+
+### Flexible Schema Mapping
+
 The system is built to ingest diverse financial data formats via a decoupled mapping layer:
 - **`source_mapping.json`**: This configuration file allows administrators to map raw Kafka fields to the canonical FinPulse schema without writing a single line of Java/Python.
 - **Normalizer Logic**: The Flink processor dynamically loads this mapping to handle field renames, data type casting, and default value injection (e.g., fallback currencies) on the fly.
@@ -206,8 +222,6 @@ The fastest way to start the entire platform is using the manager script:
 
 
 ### Next
-
-
 
 | Field                   | Data Type | Description                                                  |
 | ----------------------- | --------- | ------------------------------------------------------------ |
