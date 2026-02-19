@@ -365,26 +365,26 @@ export function ActivityHeatmap({ data, timeRange }: ActivityHeatmapProps) {
   
   return (
     <div className="bg-card border border-border rounded-xl p-6 shadow-sm w-full">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 relative">
         <div>
-          {hoveredCell ? (
-             <div className="animate-in fade-in slide-in-from-bottom-1 duration-200">
-                <h3 className="text-xs font-bold text-foreground tracking-tight flex items-center gap-2">
-                   <span className="uppercase text-muted-foreground">{hoveredCell.rowLabel}</span>
-                   {hoveredCell.colLabel && <span className="text-muted-foreground">•</span>}
-                   {hoveredCell.colLabel && <span>{hoveredCell.colLabel}</span>}
-                </h3>
-                <p className={`text-lg font-mono font-bold leading-none mt-1 ${metric === 'count' ? 'text-emerald-600' : 'text-blue-600'}`}>
-                   {metric === 'count' ? `${formatNumber(hoveredCell.val)} txns` : formatCurrency(hoveredCell.val)}
-                </p>
-             </div>
-          ) : (
-             <>
-                <h3 className="text-lg font-semibold text-foreground tracking-tight">{config.title}</h3>
-                <p className="text-sm text-muted-foreground">{config.sub}</p>
-             </>
-          )}
+           <h3 className="text-lg font-semibold text-foreground tracking-tight">{config.title}</h3>
+           <p className="text-sm text-muted-foreground">{config.sub}</p>
         </div>
+
+        {hoveredCell && (
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 hidden md:block">
+                <div className="animate-in fade-in zoom-in-95 duration-200 flex flex-col items-center">
+                    <h3 className="text-xs font-bold text-foreground tracking-tight flex items-center gap-2">
+                    <span className="uppercase text-muted-foreground">{hoveredCell.rowLabel}</span>
+                    {hoveredCell.colLabel && <span className="text-muted-foreground">•</span>}
+                    {hoveredCell.colLabel && <span>{hoveredCell.colLabel}</span>}
+                    </h3>
+                    <p className={`text-lg font-mono font-bold leading-none mt-1 ${metric === 'count' ? 'text-emerald-600' : 'text-blue-600'}`}>
+                    {metric === 'count' ? `${formatNumber(hoveredCell.val)} txns` : formatCurrency(hoveredCell.val)}
+                    </p>
+                </div>
+            </div>
+        )}
         
         <div className="flex items-center gap-1 bg-muted/50 p-0.5 rounded-lg border border-border">
           <button

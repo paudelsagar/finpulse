@@ -10,8 +10,11 @@ import {
   Settings,
   Store,
   TrendingUp,
-  Users,
+  Users, // Added Zap icon
   X // Added X icon
+  ,
+
+  Zap
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useState } from "react"; // Added useEffect
@@ -39,9 +42,10 @@ const MENU_GROUPS: MenuGroup[] = [
     label: "Analytics",
     items: [
       { icon: CreditCard, label: "Transactions", href: "/transactions" },
-      { icon: TrendingUp, label: "Revenue", href: "/revenue" },
       { icon: Users, label: "Users", href: "/users" },
       { icon: Store, label: "Merchants", href: "/merchants" },
+      { icon: Zap, label: "Engagement", href: "/engagement" },
+      { icon: TrendingUp, label: "Revenue", href: "/revenue" },
     ],
   },
   {
