@@ -193,9 +193,7 @@ export default function TransactionsPage() {
       </TabsContent>
 
       <TabsContent value="ledger" activeTab={activeTab}>
-         <div className="bg-card/50 border border-border/50 rounded-xl p-6">
-             <TransactionLedger />
-         </div>
+         <TransactionLedger />
       </TabsContent>
     </div>
   );

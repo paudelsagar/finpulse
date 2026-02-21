@@ -31,7 +31,7 @@ interface Transaction {
   details?: any;
 }
 
-export function TransactionLedger() {
+export function TransactionLedger({ userId }: { userId?: string }) {
   const [data, setData] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
@@ -70,6 +70,7 @@ export function TransactionLedger() {
           range: 'all'
         });
 
+        if (userId) params.set('userId', userId);
         if (status && status !== 'all') params.set('status', status);
         if (type && type !== 'all') params.set('type', type);
         if (flow && flow !== 'all') params.set('flow', flow);
@@ -101,7 +102,7 @@ export function TransactionLedger() {
         isMounted = false;
         clearInterval(interval);
     };
-  }, [page, limit, debouncedSearch, status, type, flow, channel, method]);
+  }, [page, limit, debouncedSearch, status, type, flow, channel, method, userId]);
 
   const columns: Column<Transaction>[] = useMemo(() => [
     {

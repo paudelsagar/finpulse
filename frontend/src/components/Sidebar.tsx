@@ -14,6 +14,7 @@ import {
   X // Added X icon
   ,
 
+
   Zap
 } from "lucide-react";
 import Link from "next/link";
@@ -24,6 +25,7 @@ type MenuItem = {
   icon: any;
   label: string;
   href: string;
+  color?: string; // Added color prop
 };
 
 type MenuGroup = {
@@ -35,31 +37,31 @@ const MENU_GROUPS: MenuGroup[] = [
   {
     label: "",
     items: [
-      { icon: LayoutDashboard, label: "Dashboard", href: "/" },
+      { icon: LayoutDashboard, label: "Dashboard", href: "/", color: "text-sky-500" },
     ],
   },
   {
     label: "Analytics",
     items: [
-      { icon: CreditCard, label: "Transactions", href: "/transactions" },
-      { icon: Users, label: "Users", href: "/users" },
-      { icon: Store, label: "Merchants", href: "/merchants" },
-      { icon: Zap, label: "Engagement", href: "/engagement" },
-      { icon: TrendingUp, label: "Revenue", href: "/revenue" },
+      { icon: CreditCard, label: "Transactions", href: "/transactions", color: "text-emerald-500" },
+      { icon: Users, label: "Users", href: "/users", color: "text-violet-500" },
+      { icon: Store, label: "Merchants", href: "/merchants", color: "text-amber-500" },
+      { icon: Zap, label: "Engagement", href: "/engagement", color: "text-pink-500" },
+      { icon: TrendingUp, label: "Revenue", href: "/revenue", color: "text-cyan-500" },
     ],
   },
   {
     label: "Management",
     items: [
-      { icon: Users, label: "Users", href: "/admin/users" },
+      { icon: Users, label: "Users", href: "/admin/users", color: "text-indigo-500" },
     ],
   },
   {
     label: "Settings",
     items: [
-      { icon: Bell, label: "Notifications", href: "/notifications" },
-      { icon: Settings, label: "Settings", href: "/settings" },
-      { icon: HelpCircle, label: "Help", href: "/help" },
+      { icon: Bell, label: "Notifications", href: "/notifications", color: "text-orange-500" },
+      { icon: Settings, label: "Settings", href: "/settings", color: "text-slate-500" },
+      { icon: HelpCircle, label: "Help", href: "/help", color: "text-green-500" },
     ],
   },
 ];
@@ -151,7 +153,7 @@ export function Sidebar({
                     onClick={onClose}
                     className="group relative flex items-center gap-3 px-3 py-2 rounded-lg text-muted-foreground hover:bg-primary/10 hover:text-primary transition-all hover:z-50"
                   >
-                    <item.icon size={20} />
+                    <item.icon size={20} className={`transition-colors ${item.color || ''} group-hover:text-current`} />
                     
                     {(!isCollapsed || isOpen) ? (
                       <span className="font-medium text-sm">{item.label}</span>

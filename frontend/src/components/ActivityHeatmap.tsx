@@ -257,63 +257,207 @@ export function ActivityHeatmap({ data, timeRange }: ActivityHeatmapProps) {
             }
         };
       },
-      '365d': () => {
-          // 12 Rows (Months), 31 Cols (Days)
-          const now = new Date();
-          const monthsConfig: { month: number; year: number; label: string }[] = [];
-          for (let i = 0; i < 12; i++) {
-              const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-              monthsConfig.push({
-                  month: d.getMonth(),
-                  year: d.getFullYear(),
-                  label: d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' })
-              });
-          }
-
+      '5m': () => {
+          // 6 Rows (10s Buckets), 5 Cols (Minutes)
+          const minutesConfig = Array.from({length: 5}).map((_, i) => ({ label: `-${5-i}m`, offset: 5-i-1 }));
+          
           return {
-              title: 'Yearly Intensity',
-              sub: 'Vertical: Month | Horizontal: Day',
-              cols: Array.from({length: 31}).map((_, i) => ({ 
-                  label: (i+1) % 5 === 0 ? `${i+1}` : '', // Label every 5th day
-                  key: i+1 
-              })),
-              colCount: 31,
-              grid: monthsConfig.map(mCfg => {
-                   // Optimize: Filter data for this month first? 
-                   // Or just use Map "Year:Month:Day"
-                   // This runs inside map loop, but we can build map once outside if we could.
-                   // But `grid` maps over `monthsConfig`. 
-                   // We need to build map *before* mapping grid.
-                   // Since we can't easily inject code before `grid:`, 
-                   // we can optimize by doing filtering or just simpler lookup.
-                   // But `grid` expects an array.
-                   // Actually, we can define `process` function for 365d strategy too!
-                   // The current implementation uses inline `grid: ...`.
-                   // Let's refactor to use `process`.
-                   return null; // Placeholder to force switch to process()
-              }),
+              title: 'Real-time Intensity (5m)',
+              sub: 'Vertical: Seconds (10s buckets) | Horizontal: Minutes',
+              cols: minutesConfig.map(m => ({ label: m.label, key: m.offset })),
+              colCount: 5,
+              grid: [],
               process: () => {
-                   // Optimize: Map Key "Year:Month:Day"
+                   const now = new Date();
+                   const buckets = 6; // 60s / 10s
+                   const bucketSize = 10;
                    const dataMap = new Map<string, ActivityItem>();
                    data.forEach(d => {
                        const t = new Date(d.date);
-                       const key = `${t.getFullYear()}:${t.getMonth()}:${t.getDate()}`;
-                       dataMap.set(key, d); 
+                       const key = `${t.getHours()}:${t.getMinutes()}:${Math.floor(t.getSeconds() / 10) * 10}`;
+                       dataMap.set(key, d); // Data is already aggregated to 10s by backend
                    });
 
-                   return monthsConfig.map(mCfg => {
-                       return {
-                           label: mCfg.label,
-                           cells: Array.from({length: 31}).map((_, dIdx) => {
-                               const dayNum = dIdx + 1;
-                               const key = `${mCfg.year}:${mCfg.month}:${dayNum}`;
-                               const found = dataMap.get(key);
-                               return { val: found ? (metric === 'count' ? found.count : found.volume) : 0 };
-                           })
-                       };
+                   const grid = Array.from({length: buckets}).map((_, bIdx) => {
+                       const startSec = bIdx * bucketSize;
+                       const endSec = startSec + bucketSize - 1;
+                       const label = `${startSec}-${endSec}s`;
+
+                       const cells = minutesConfig.map(m => {
+                           const targetMinute = new Date(now.getTime() - m.offset * 60000);
+                           const targetH = targetMinute.getHours();
+                           const targetM = targetMinute.getMinutes();
+
+                           // Backend gives 10s bucket, so we just match exact key
+                           const key = `${targetH}:${targetM}:${startSec}`; 
+                           const found = dataMap.get(key);
+                           return { val: found ? (metric === 'count' ? found.count : found.volume) : 0 };
+                       });
+                       return { label, cells };
                    });
+                   return grid.reverse(); // Show 0-10s at bottom? Or top? Usually top is fine.
+                   // Actually logic above puts 0s at row 0 (top).
               }
           };
+      },
+      '3M': () => {
+        // "Contribution Graph" Style
+        // Rows: 7 Days (Mon-Sun)
+        // Cols: 14 Weeks
+        const now = new Date();
+        const weeks = 14; 
+        
+        return {
+            title: 'Quarterly Activity',
+            sub: 'Vertical: Day of Week | Horizontal: Weeks',
+            cols: Array.from({length: weeks}).map((_, i) => ({ label: `W-${weeks-i}`, key: i })),
+            colCount: weeks,
+            grid: [],
+            process: () => {
+                 const dataMap = new Map<string, ActivityItem>();
+                 data.forEach(d => {
+                     const t = new Date(d.date);
+                     const key = t.toLocaleDateString();
+                     dataMap.set(key, d);
+                 });
+
+                 // Days of week labels
+                 const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+                 
+                 const grid = days.map((dayName, dIdx) => {
+                     const cells = Array.from({length: weeks}).map((_, wIdx) => {
+                         // Calculate date: Now - (weeks - 1 - wIdx) weeks
+                         // Then find the specific day of that week
+                         const weekOffset = weeks - 1 - wIdx;
+                         const d = new Date(now);
+                         d.setDate(d.getDate() - (weekOffset * 7));
+                         // Adjust to match dIdx (day of week)
+                         // Current d is "same day of week as today" minus weeks.
+                         // We need to find the date corresponding to dIdx in that week.
+                         const currentDay = d.getDay();
+                         const diff = dIdx - currentDay;
+                         d.setDate(d.getDate() + diff);
+                         
+                         const key = d.toLocaleDateString();
+                         const found = dataMap.get(key);
+                         return { val: found ? (metric === 'count' ? found.count : found.volume) : 0 };
+                     });
+                     return { label: dayName, cells };
+                 });
+                 return grid;
+            }
+        };
+      },
+      '6M': () => {
+          // Rows: 6 Months
+          // Cols: ~4.5 Weeks (bucketed by week)
+          // Since data is 1w aggregated.
+          const now = new Date();
+          
+          return {
+              title: 'Semi-Annual Trend',
+              sub: 'Vertical: Month | Horizontal: Week of Month',
+              cols: [1, 2, 3, 4, 5].map(w => ({ label: `W${w}`, key: w })),
+              colCount: 5,
+              grid: [],
+              process: () => {
+                  const dataMap = new Map<string, ActivityItem>();
+                   data.forEach(d => {
+                       const t = new Date(d.date);
+                       // Key by "Month:WeekIdx" ?
+                       // Week index within month (0-4)
+                       const day = t.getDate();
+                       const weekIdx = Math.floor((day - 1) / 7);
+                       const key = `${t.getMonth()}:${weekIdx}`;
+                       dataMap.set(key, d);
+                   });
+
+                   const grid = Array.from({length: 6}).map((_, mIdx) => {
+                       const d = new Date(now.getFullYear(), now.getMonth() - (5 - mIdx), 1);
+                       const monthLabel = d.toLocaleDateString('en-US', { month: 'short' });
+                       const monthVal = d.getMonth();
+
+                       const cells = Array.from({length: 5}).map((_, wIdx) => {
+                           const key = `${monthVal}:${wIdx}`;
+                           const found = dataMap.get(key);
+                           return { val: found ? (metric === 'count' ? found.count : found.volume) : 0 };
+                       });
+                       return { label: monthLabel, cells };
+                   });
+                   return grid;
+              }
+          };
+      },
+      '365d': () => {
+          // 12 Rows (Months), 4 Weeks (approx) - since data is 1w
+          // Backend sends 1w buckets for 365d
+          const now = new Date();
+
+          return {
+              title: 'Yearly Intensity',
+              sub: 'Vertical: Month | Horizontal: Weeks',
+              cols: [1, 2, 3, 4, 5].map(w => ({ label: `W${w}`, key: w })),
+              colCount: 5,
+              grid: [],
+              process: () => {
+                   const dataMap = new Map<string, ActivityItem>();
+                   data.forEach(d => {
+                       const t = new Date(d.date);
+                       const day = t.getDate();
+                       const weekIdx = Math.floor((day - 1) / 7);
+                       const key = `${t.getFullYear()}:${t.getMonth()}:${weekIdx}`;
+                       dataMap.set(key, d);
+                   });
+
+                   const grid = [];
+                   for (let i = 0; i < 12; i++) {
+                       const d = new Date(now.getFullYear(), now.getMonth() - (11 - i), 1);
+                       const monthLabel = d.toLocaleDateString('en-US', { month: 'short' });
+                       const yearStats = d.getFullYear(); // Handle year boundary
+                       const monthVal = d.getMonth();
+
+                       const cells = Array.from({length: 5}).map((_, wIdx) => {
+                           const key = `${yearStats}:${monthVal}:${wIdx}`;
+                           const found = dataMap.get(key);
+                           return { val: found ? (metric === 'count' ? found.count : found.volume) : 0 };
+                       });
+                       grid.push({ label: monthLabel, cells });
+                   }
+                   return grid;
+              }
+          };
+      },
+      '3y': () => {
+           // Rows: 3 Years
+           // Cols: 12 Months
+           const now = new Date();
+           
+           return {
+               title: 'Long-term History',
+               sub: 'Vertical: Year | Horizontal: Month',
+               cols: Array.from({length: 12}).map((_, i) => ({ label: new Date(0, i).toLocaleDateString('en-US', {month:'narrow'}), key: i })),
+               colCount: 12,
+               grid: [],
+               process: () => {
+                    const dataMap = new Map<string, ActivityItem>();
+                    data.forEach(d => {
+                        const t = new Date(d.date);
+                        const key = `${t.getFullYear()}:${t.getMonth()}`;
+                        dataMap.set(key, d);
+                    });
+
+                    const grid = Array.from({length: 3}).map((_, yIdx) => {
+                        const targetYear = now.getFullYear() - (2 - yIdx);
+                        const cells = Array.from({length: 12}).map((_, mIdx) => {
+                             const key = `${targetYear}:${mIdx}`;
+                             const found = dataMap.get(key);
+                             return { val: found ? (metric === 'count' ? found.count : found.volume) : 0 };
+                        });
+                        return { label: targetYear.toString(), cells };
+                    });
+                    return grid;
+               }
+           };
       },
       'default': () => {
           // Fallback to 7d logic if unknown

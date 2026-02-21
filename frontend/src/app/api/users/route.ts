@@ -22,12 +22,16 @@ export async function GET(request: Request) {
   let interval = '1m'; // Default interval
 
   switch (range) {
+    case '5m': startTime = now - 5 * 60 * 1000; interval = '10s'; break;
     case '15m': startTime = now - 15 * 60 * 1000; interval = '1m'; break;
     case '1h': startTime = now - 60 * 60 * 1000; interval = '2m'; break;
     case '24h': startTime = now - 24 * 60 * 60 * 1000; interval = '30m'; break;
     case '7d': startTime = now - 7 * 24 * 60 * 60 * 1000; interval = '4h'; break;
     case '30d': startTime = now - 30 * 24 * 60 * 60 * 1000; interval = '12h'; break;
+    case '3M': startTime = now - 90 * 24 * 60 * 60 * 1000; interval = '1d'; break;
+    case '6M': startTime = now - 180 * 24 * 60 * 60 * 1000; interval = '1d'; break;
     case '365d': startTime = now - 365 * 24 * 60 * 60 * 1000; interval = '1d'; break;
+    case '3y': startTime = now - 3 * 365 * 24 * 60 * 60 * 1000; interval = '7d'; break;
     case 'all': startTime = 0; interval = '7d'; break;
     case 'custom': {
         if (startDate) startTime = new Date(startDate).getTime();
@@ -49,21 +53,15 @@ export async function GET(request: Request) {
       index: 'es_entity_flows',
       size: 0,
       query: { 
-        bool: {
-          must: [
-            { prefix: { "entityId": "u_" } },
-            { range: { ts: { gte: localStart, lte: localEnd } } }
-          ]
-        }
+        range: { tran_date: { gte: localStart, lte: localEnd } }
       },
       aggs: {
         unique_users: {
           terms: {
-            field: 'entityId',
+            field: 'entity_id',
             size: 5000 
           },
           aggs: {
-            name: { terms: { field: 'entityName', size: 1 } },
             flows: {
               terms: { field: 'flow_type' },
               aggs: {
@@ -83,7 +81,7 @@ export async function GET(request: Request) {
 
         return {
             id: b.key,
-            name: b.name.buckets[0]?.key || 'Unknown',
+            name: `User ${b.key}`,
             total_spent: debit,
             total_received: credit,
             tx_count: b.doc_count
@@ -94,16 +92,21 @@ export async function GET(request: Request) {
 
     // Add Trend Aggregation (scoped by time)
     const trendResults = await client.search({
-      index: 'es_transactions',
+      index: 'es_entity_flows',
       size: 0,
       query: {
-        range: { ts: { gte: localStart } }
+        range: { tran_date: { gte: localStart, lte: localEnd } }
       },
       aggs: {
         activity_trend: {
           date_histogram: {
-            field: 'ts',
-            fixed_interval: interval
+            field: 'tran_date',
+            fixed_interval: interval,
+            min_doc_count: 0,
+            extended_bounds: {
+              min: localStart,
+              max: localEnd
+            }
           },
           aggs: {
             volume: { sum: { field: 'amount' } }

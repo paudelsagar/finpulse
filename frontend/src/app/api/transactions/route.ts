@@ -77,6 +77,12 @@ export async function GET(request: Request) {
       filter.push({ term: { "merchant_category": category } });
     }
 
+    // User scope filter
+    const userId = searchParams.get('userId') || '';
+    if (userId) {
+      filter.push({ term: { "user_id": userId } });
+    }
+
     if (localRangeStart) {
       filter.push({ range: { ts: { gte: localRangeStart, lte: localRangeEnd } } });
     } else if (startDate || endDate) {

@@ -13,12 +13,16 @@ interface TimeFilterProps {
 }
 
 export const TIME_OPTIONS = [
+  { value: "5m", label: "Last 5 Minutes" },
   { value: "15m", label: "Last 15 Minutes" },
   { value: "1h", label: "Last Hour" },
   { value: "24h", label: "Last 24 Hours" },
   { value: "7d", label: "Last 7 Days" },
   { value: "30d", label: "Last 30 Days" },
+  { value: "3M", label: "Last 3 Months" },
+  { value: "6M", label: "Last 6 Months" },
   { value: "365d", label: "Last Year" },
+  { value: "3y", label: "Last 3 Years" },
   { value: "all", label: "All Time" },
   { value: "custom", label: "Custom Range" },
 ];
