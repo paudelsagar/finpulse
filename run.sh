@@ -148,7 +148,7 @@ elif [ "$1" == "gen" ]; then
     fi
 
     # Run in background with host-reachable broker
-    nohup env KAFKA_BROKER=localhost:9092 python3 -u main.py > logs/datagen.log 2>&1 &
+    nohup env KAFKA_BROKER=localhost:9092 python3 -u main.py > ../../logs/datagen.log 2>&1 &
     PID=$!
     echo $PID > ../../pids/datagen.pid
     echo "Data Generator started (PID: $PID). Logs: logs/datagen.log"

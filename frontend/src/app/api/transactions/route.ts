@@ -83,6 +83,12 @@ export async function GET(request: Request) {
       filter.push({ term: { "user_id": userId } });
     }
 
+    // Merchant scope filter
+    const merchantId = searchParams.get('merchantId') || '';
+    if (merchantId) {
+      filter.push({ term: { "merchant_id": merchantId } });
+    }
+
     if (localRangeStart) {
       filter.push({ range: { ts: { gte: localRangeStart, lte: localRangeEnd } } });
     } else if (startDate || endDate) {

@@ -3,11 +3,11 @@
 import { Column, DataTable } from "@/components/DataTable";
 import { POLLING_INTERVAL } from "@/lib/constants";
 import {
-  CHANNELS,
-  FLOW_TYPES,
-  PAYMENT_METHODS,
-  TRANSACTION_STATUSES,
-  TRANSACTION_TYPES
+    CHANNELS,
+    FLOW_TYPES,
+    PAYMENT_METHODS,
+    TRANSACTION_STATUSES,
+    TRANSACTION_TYPES
 } from "@/lib/transaction-options";
 import { formatCurrency } from "@/lib/utils";
 import { ArrowUpRight, Check, Clock, Search, X } from "lucide-react";
@@ -31,7 +31,7 @@ interface Transaction {
   details?: any;
 }
 
-export function TransactionLedger({ userId }: { userId?: string }) {
+export function TransactionLedger({ userId, merchantId }: { userId?: string; merchantId?: string }) {
   const [data, setData] = useState<Transaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
@@ -71,6 +71,7 @@ export function TransactionLedger({ userId }: { userId?: string }) {
         });
 
         if (userId) params.set('userId', userId);
+        if (merchantId) params.set('merchantId', merchantId);
         if (status && status !== 'all') params.set('status', status);
         if (type && type !== 'all') params.set('type', type);
         if (flow && flow !== 'all') params.set('flow', flow);

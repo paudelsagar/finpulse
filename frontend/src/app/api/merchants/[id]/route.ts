@@ -12,154 +12,203 @@ export async function GET(
 ) {
   const { id } = await params;
   const merchantId = id;
-
   const { searchParams } = new URL(request.url);
-  const range = searchParams.get('range') || '24h';
-  const startDate = searchParams.get('startDate');
-  const endDate = searchParams.get('endDate');
+  const range = searchParams.get('range') || 'all';
+  const customStart = searchParams.get('startDate') || '';
+  const customEnd = searchParams.get('endDate') || '';
 
-  // Build temporal filter
-  const filters: any[] = [
-    { term: { "targetId": merchantId } }
-  ];
-
-  if (startDate || endDate) {
-    const rangeFilter: any = {};
-    if (startDate) rangeFilter.gte = startDate;
-    if (endDate) rangeFilter.lte = endDate;
-    filters.push({ range: { ts: rangeFilter } });
-  } else if (range && range !== 'all') {
-    filters.push({ range: { ts: { gte: `now-${range}` } } });
-  }
-
-  // Calculate Start Time matching dashboard logic
   const now = Date.now();
-  let startTime = now - 24 * 60 * 60 * 1000; 
+  let startTime = 0;
   let endTime = now;
+  let histogramInterval = '1h';
 
   switch (range) {
-    case '15m': startTime = now - 15 * 60 * 1000; break;
-    case '1h': startTime = now - 60 * 60 * 1000; break;
-    case '24h': startTime = now - 24 * 60 * 60 * 1000; break;
-    case '7d': startTime = now - 7 * 24 * 60 * 60 * 1000; break;
-    case '30d': startTime = now - 30 * 24 * 60 * 60 * 1000; break;
-    case '365d': startTime = now - 365 * 24 * 60 * 60 * 1000; break;
-    case 'all': startTime = 0; break;
+    case '5m':   startTime = now - 5 * 60 * 1000;   histogramInterval = '10s'; break;
+    case '15m':  startTime = now - 15 * 60 * 1000;   histogramInterval = '1m';  break;
+    case '1h':   startTime = now - 60 * 60 * 1000;   histogramInterval = '2m';  break;
+    case '24h':  startTime = now - 24 * 60 * 60 * 1000;   histogramInterval = '30m'; break;
+    case '7d':   startTime = now - 7 * 24 * 60 * 60 * 1000;   histogramInterval = '4h';  break;
+    case '30d':  startTime = now - 30 * 24 * 60 * 60 * 1000;  histogramInterval = '12h'; break;
+    case '3M':   startTime = now - 90 * 24 * 60 * 60 * 1000;  histogramInterval = '1d';  break;
+    case '6M':   startTime = now - 180 * 24 * 60 * 60 * 1000; histogramInterval = '1d';  break;
+    case '365d': startTime = now - 365 * 24 * 60 * 60 * 1000; histogramInterval = '1d';  break;
+    case '3y':   startTime = now - 3 * 365 * 24 * 60 * 60 * 1000; histogramInterval = '7d'; break;
+    case 'all':  startTime = 0; histogramInterval = '1h'; break;
     case 'custom': {
-        if (startDate) startTime = new Date(startDate).getTime();
-        if (endDate) endTime = new Date(endDate).getTime();
-        break;
+      if (customStart) startTime = new Date(customStart).getTime();
+      if (customEnd) endTime = new Date(customEnd).getTime();
+      histogramInterval = '1h';
+      break;
     }
   }
-  
-  const localStart = formatLocalDate(new Date(startTime));
-  const localEnd = formatLocalDate(new Date(endTime));
-
-  const query = {
-    bool: {
-      must: filters
-    }
-  };
 
   try {
-    // 1. Fetch Merchant Summary & Recent Sales
-    const recentSales = await client.search({
+    const entityQuery: any = {
+      bool: {
+        must: [
+          { term: { merchant_id: merchantId } }
+        ]
+      }
+    };
+
+    if (startTime > 0) {
+      entityQuery.bool.must.push({
+        range: { ts: { gte: formatLocalDate(new Date(startTime)), lte: formatLocalDate(new Date(endTime)) } }
+      });
+    }
+
+    // 1. Fetch Recent Transactions
+    const recentTx = await client.search({
       index: 'es_transactions',
-      query,
-      sort: [{ "ts": "desc" }],
+      query: entityQuery,
+      sort: [{ ts: 'desc' }],
       size: 50
     });
 
-    // 2. Aggregate Analytics for this Merchant
+    // 2. Full Analytics Aggregation
     const analytics = await client.search({
       index: 'es_transactions',
       size: 0,
-      query,
+      query: entityQuery,
       aggs: {
-        total_revenue: { sum: { field: 'amount' } },
-        avg_sale: { avg: { field: 'amount' } },
-        tx_count: { value_count: { field: 'transactionId' } },
-        unique_customers: { cardinality: { field: 'sourceId' } },
+        total_amount: { sum: { field: 'amount' } },
+        avg_amount: { avg: { field: 'amount' } },
+        max_amount: { max: { field: 'amount' } },
+        min_amount: { min: { field: 'amount' } },
+        tx_count: { value_count: { field: 'tran_id' } },
+        unique_customers: { cardinality: { field: 'user_id' } },
+
+        by_credit: {
+          terms: { field: 'is_credit' },
+          aggs: {
+            volume: { sum: { field: 'amount' } },
+            count: { value_count: { field: 'tran_id' } }
+          }
+        },
+
+        by_category: {
+          terms: { field: 'merchant_category', size: 15 },
+          aggs: { volume: { sum: { field: 'amount' } } }
+        },
+
+        by_tran_type: {
+          terms: { field: 'tran_type', size: 10 },
+          aggs: { volume: { sum: { field: 'amount' } } }
+        },
+
+        by_payment_method: {
+          terms: { field: 'payment_method', size: 10 },
+          aggs: { volume: { sum: { field: 'amount' } } }
+        },
+
+        by_channel: {
+          terms: { field: 'channel', size: 10 },
+          aggs: { volume: { sum: { field: 'amount' } } }
+        },
+
+        by_status: {
+          terms: { field: 'tran_status', size: 10 },
+          aggs: { volume: { sum: { field: 'amount' } } }
+        },
+
         revenue_over_time: {
           date_histogram: {
             field: 'ts',
-            fixed_interval: range === '15m' || range === '1h' ? '1m' : '1d',
+            fixed_interval: histogramInterval,
             min_doc_count: 0
           },
           aggs: {
             volume: { sum: { field: 'amount' } },
-            count: { value_count: { field: 'transactionId' } }
-          }
-        },
-        hourly_distribution: {
-          terms: {
-            script: {
-              source: "doc['ts'].size() > 0 ? doc['ts'].value.hour : 0",
-              lang: "painless"
+            credit_vol: {
+              filter: { term: { is_credit: true } },
+              aggs: { vol: { sum: { field: 'amount' } } }
             },
-            size: 24
+            debit_vol: {
+              filter: { term: { is_credit: false } },
+              aggs: { vol: { sum: { field: 'amount' } } }
+            }
           }
         },
-        top_users: {
-          terms: {
-            field: 'sourceId',
-            size: 50,
-            order: { volume: "desc" }
-          },
+
+        top_customers: {
+          terms: { field: 'user_id', size: 10, order: { volume: 'desc' } },
           aggs: {
-            volume: { sum: { field: 'amount' } },
-            count: { value_count: { field: 'transactionId' } },
-            name: { terms: { field: 'sourceName', size: 1 } }
+            volume: { sum: { field: 'amount' } }
           }
+        },
+
+        currencies: {
+          terms: { field: 'currency', size: 5 }
         }
       }
     });
 
     const aggs = analytics.aggregations as any;
 
-    const extractUserData = (buckets: any[]) => {
-      return buckets.map((b: any) => ({
-        id: b.key,
-        name: b.name.buckets[0]?.key || 'Unknown User',
-        volume: b.volume.value,
-        count: b.count.value
-      }));
-    };
+    const creditBucket = aggs.by_credit.buckets.find((b: any) => b.key === 1 || b.key_as_string === 'true');
+    const debitBucket = aggs.by_credit.buckets.find((b: any) => b.key === 0 || b.key_as_string === 'false');
+    const totalCredit = creditBucket?.volume?.value || 0;
+    const totalDebit = debitBucket?.volume?.value || 0;
+    const creditCount = creditBucket?.count?.value || 0;
+    const debitCount = debitBucket?.count?.value || 0;
 
-    const topUsers = aggs.top_users.buckets;
-    const rankings = {
-      top_by_volume: extractUserData([...topUsers].sort((a, b) => b.volume.value - a.volume.value).slice(0, 10)),
-      top_by_count: extractUserData([...topUsers].sort((a, b) => b.count.value - a.count.value).slice(0, 10)),
-      top_by_revenue: extractUserData([...topUsers].sort((a, b) => b.volume.value - a.volume.value).slice(0, 10)) // Same as volume for merchant-user relationship
-    };
-    
-    // Get merchant name from first transaction
-    const merchantName = (recentSales.hits.hits[0]?._source as any)?.targetName || 'Unknown Merchant';
+    const successBucket = aggs.by_status.buckets.find((b: any) => b.key === 'SUCCESS');
+    const totalTx = aggs.tx_count.value || 1;
+    const successRate = successBucket ? (successBucket.doc_count / totalTx) * 100 : 0;
+
+    // Get merchant details from first transaction
+    const firstTx = recentTx.hits.hits[0]?._source as any;
 
     return NextResponse.json({
       id: merchantId,
-      name: merchantName,
+      name: merchantId,
+      category: firstTx?.merchant_category || 'Unknown',
+      mcc_code: firstTx?.mcc_code || '0000',
       summary: {
-        total_revenue: aggs.total_revenue.value,
-        avg_sale: aggs.avg_sale.value,
+        total_volume: aggs.total_amount.value,
+        avg_amount: aggs.avg_amount.value,
+        max_amount: aggs.max_amount.value,
+        min_amount: aggs.min_amount.value,
         tx_count: aggs.tx_count.value,
-        unique_customers: aggs.unique_customers.value
+        unique_customers: aggs.unique_customers.value,
+        total_credit: totalCredit,
+        total_debit: totalDebit,
+        credit_count: creditCount,
+        debit_count: debitCount,
+        net_flow: totalCredit - totalDebit,
+        success_rate: successRate,
+        currencies: aggs.currencies.buckets.map((b: any) => b.key),
       },
       charts: {
+        by_category: aggs.by_category.buckets.map((b: any) => ({
+          name: b.key, value: b.volume.value, count: b.doc_count,
+        })),
+        by_tran_type: aggs.by_tran_type.buckets.map((b: any) => ({
+          name: b.key, value: b.volume.value, count: b.doc_count,
+        })),
+        by_payment_method: aggs.by_payment_method.buckets.map((b: any) => ({
+          name: b.key, value: b.volume.value, count: b.doc_count,
+        })),
+        by_channel: aggs.by_channel.buckets.map((b: any) => ({
+          name: b.key, value: b.volume.value, count: b.doc_count,
+        })),
+        by_status: aggs.by_status.buckets.map((b: any) => ({
+          name: b.key, value: b.volume.value, count: b.doc_count,
+        })),
         revenue_over_time: aggs.revenue_over_time.buckets.map((b: any) => ({
           date: b.key_as_string,
-          key_as_string: b.key_as_string, // For VolumeChart compat
-          value: b.volume.value,           // For VolumeChart compat
           volume: b.volume.value,
-          count: b.count.value
+          credit: b.credit_vol.vol.value,
+          debit: b.debit_vol.vol.value,
         })),
-        hourly_distribution: aggs.hourly_distribution.buckets.map((b: any) => ({
-          hour: b.key,
-          count: b.doc_count
-        })).sort((a: any, b: any) => a.hour - b.hour)
+        top_customers: aggs.top_customers.buckets.map((b: any) => ({
+          id: b.key,
+          name: `User ${b.key}`,
+          volume: b.volume.value,
+          count: b.doc_count,
+        })),
       },
-      rankings,
-      transactions: recentSales.hits.hits.map(h => h._source)
+      transactions: recentTx.hits.hits.map(h => h._source)
     });
 
   } catch (error) {
